@@ -1,0 +1,20 @@
+# Generated Safari app wrapper — produced locally by
+# xcrun safari-web-extension-converter, never committed.
+SafariProject/
+
+# macOS
+.DS_Store
+._*
+
+# Xcode — per-user state and build artifacts
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad
+build/
+DerivedData/
+
+# Signing / secrets — never commit anything signable
+*.mobileprovision
+*.provisionprofile
+*.p12
+*.cer

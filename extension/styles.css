@@ -1,0 +1,44 @@
+/* LinkedIn Focus — hide rules bound to html.lf-* classes.
+   Two selector sets: new React shell (data-testid) + classic Ember shell
+   (semantic classes); LinkedIn serves either depending on page/rollout. */
+
+/* --- Feed / center panel (incl. composer) --- */
+/* New shell: mainFeed only exists on the feed route, no scoping needed. */
+html.lf-hide-feed [data-testid="mainFeed"] {
+  display: none !important;
+}
+/* Classic shell: .scaffold-layout__main is also the center column of
+   profile/messaging pages, so scope to the feed route (lf-feed-page). */
+html.lf-hide-feed.lf-feed-page .scaffold-layout__main {
+  display: none !important;
+}
+
+/* --- Ads: JS-flagged promoted posts + sidebar advertisements --- */
+/* New shell: the right-rail ad is the only iframe inside an aside. */
+html.lf-hide-ads .lf-ad,
+html.lf-hide-ads aside div:has(> iframe),
+html.lf-hide-ads [aria-label="Advertisement"],
+html.lf-hide-ads .ad-banner-container {
+  display: none !important;
+}
+
+/* --- LinkedIn News module (right sidebar) --- */
+/* New shell: marked by JS (no stable anchor); classic shell: known hooks. */
+html.lf-hide-news .lf-news,
+html.lf-hide-news .news-module,
+html.lf-hide-news #feed-news-module,
+html.lf-hide-news .feed-news-module,
+html.lf-hide-news section[aria-label="LinkedIn News"],
+html.lf-hide-news section[aria-label="LinkedIn Nachrichten"],
+html.lf-hide-news div[data-view-name="feed-news-module"] {
+  display: none !important;
+}
+
+/* --- Notification badges: red counters/dots in the nav; nav stays clickable --- */
+/* New shell: the badge is the only span with data-color-scheme in the nav. */
+html.lf-hide-badges [data-testid="primary-nav"] span[data-color-scheme],
+html.lf-hide-badges #global-nav .notification-badge,
+html.lf-hide-badges #global-nav .notification-badge--show,
+html.lf-hide-badges #global-nav .notification-badge__count {
+  display: none !important;
+}

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="popup.css">
+  <title>LinkedIn Focus</title>
+</head>
+<body>
+  <header>
+    <h1>LinkedIn Focus</h1>
+    <p class="hint">An = ausgeblendet (Fokus)</p>
+  </header>
+
+  <ul class="toggles">
+    <li>
+      <label for="hideFeed">Feed / Timeline</label>
+      <span class="switch">
+        <input type="checkbox" id="hideFeed">
+        <span class="track"><span class="thumb"></span></span>
+      </span>
+    </li>
+    <li>
+      <label for="hideAds">Werbung</label>
+      <span class="switch">
+        <input type="checkbox" id="hideAds">
+        <span class="track"><span class="thumb"></span></span>
+      </span>
+    </li>
+    <li>
+      <label for="hideNews">News &amp; Spiele</label>
+      <span class="switch">
+        <input type="checkbox" id="hideNews">
+        <span class="track"><span class="thumb"></span></span>
+      </span>
+    </li>
+    <li>
+      <label for="hideBadges">Notification-Badges</label>
+      <span class="switch">
+        <input type="checkbox" id="hideBadges">
+        <span class="track"><span class="thumb"></span></span>
+      </span>
+    </li>
+  </ul>
+
+  <script src="popup.js"></script>
+</body>
+</html>

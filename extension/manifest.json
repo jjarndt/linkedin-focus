@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "LinkedIn Focus",
+  "version": "1.0.0",
+  "description": "Blendet Feed, Werbung, News und Benachrichtigungs-Badges auf LinkedIn aus, damit du fokussiert bleibst.",
+  "permissions": ["storage"],
+  "host_permissions": ["*://*.linkedin.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["*://*.linkedin.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "LinkedIn Focus"
+  },
+  "icons": {
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png",
+    "512": "icons/icon-512.png"
+  }
+}
