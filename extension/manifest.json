@@ -4,11 +4,10 @@
   "version": "1.0.0",
   "description": "Blendet Feed, Werbung, News und Benachrichtigungs-Badges auf LinkedIn aus, damit du fokussiert bleibst.",
   "permissions": ["storage"],
-  "host_permissions": ["*://*.linkedin.com/*"],
   "content_scripts": [
     {
       "matches": ["*://*.linkedin.com/*"],
-      "js": ["content.js"],
+      "js": ["shared.js", "content.js"],
       "css": ["styles.css"],
       "run_at": "document_start",
       "all_frames": false
