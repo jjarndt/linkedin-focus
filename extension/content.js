@@ -9,8 +9,7 @@
 
 const api = globalThis.browser ?? globalThis.chrome;
 
-// Keep in sync with popup/popup.js.
-const DEFAULTS = { hideFeed: true, hideAds: true, hideNews: true, hideBadges: true };
+// DEFAULTS comes from shared.js (loaded first via the manifest js array).
 
 const CLASS_MAP = {
   hideFeed: "lf-hide-feed",
@@ -19,7 +18,9 @@ const CLASS_MAP = {
   hideBadges: "lf-hide-badges",
 };
 
-// Debug: window.__lfDebug = true OR localStorage.setItem('lfDebug','1') to log match reasons.
+// Debug: localStorage.setItem('lfDebug','1') in any console, OR window.__lfDebug = true
+// — the latter only from the extension's content-script context (console context
+// dropdown in Web Inspector); the page world's window is a different object.
 function debugEnabled() {
   try {
     return window.__lfDebug === true || localStorage.getItem("lfDebug") === "1";
@@ -44,7 +45,7 @@ function isFeedPage() {
 function applyState() {
   const root = document.documentElement;
   for (const [key, cls] of Object.entries(CLASS_MAP)) {
-    root.classList.toggle(cls, currentState[key] !== false);
+    root.classList.toggle(cls, currentState[key]);
   }
   root.classList.toggle("lf-feed-page", isFeedPage());
 }
@@ -69,12 +70,17 @@ const CLASSIC_HEADER_SELECTOR = [
   ".update-components-actor__description",
 ].join(",");
 
+// The checked-flag stores the post's identity (activity urn / mount id), not a
+// bare "1": if the shell ever recycles a container for a different post, the
+// changed identity forces a re-check and clears a stale lf-ad flag.
 function markAdsClassic() {
   document.querySelectorAll(CLASSIC_POST_SELECTOR).forEach((post) => {
-    if (post.dataset.lfChecked === "1") return;
+    const id = post.getAttribute("data-id") || post.getAttribute("data-urn") || "1";
+    if (post.dataset.lfChecked === id) return;
     const header = post.querySelector(CLASSIC_HEADER_SELECTOR);
     if (!header) return; // not hydrated yet, retry on next scan
-    post.dataset.lfChecked = "1";
+    post.dataset.lfChecked = id;
+    post.classList.remove("lf-ad");
     if (PROMOTED_RE.test(header.textContent || "")) {
       post.classList.add("lf-ad");
       log("ad (classic):", (header.textContent || "").trim().slice(0, 60));
@@ -83,14 +89,19 @@ function markAdsClassic() {
 }
 
 function markAdsNewShell() {
-  // Post wrapper = lazy-mount child of the feed container.
+  // Post wrapper = direct child of the feed container. Not filtered on
+  // [data-lazy-mount-id] so the marker survives if that internal attribute
+  // is renamed; non-post children simply never grow text and are skipped.
   document
-    .querySelectorAll('[data-testid="mainFeed"] > [data-lazy-mount-id]')
+    .querySelectorAll('[data-testid="mainFeed"] > *')
     .forEach((post) => {
-      if (post.dataset.lfChecked === "1") return;
-      if (!post.firstElementChild) return; // not mounted yet, retry on next scan
-      post.dataset.lfChecked = "1";
-      for (const el of post.querySelectorAll("p, span")) {
+      const id = post.getAttribute("data-lazy-mount-id") || "1";
+      if (post.dataset.lfChecked === id) return;
+      const leaves = post.querySelectorAll("p, span");
+      if (!leaves.length) return; // skeleton / not hydrated yet, retry on next scan
+      post.dataset.lfChecked = id;
+      post.classList.remove("lf-ad");
+      for (const el of leaves) {
         if (el.childElementCount === 0 && LABELS.has((el.textContent || "").trim())) {
           post.classList.add("lf-ad");
           log("ad (new shell):", (el.textContent || "").trim());
@@ -120,10 +131,13 @@ function markNews() {
       if (!marker) continue;
       pending.splice(pending.indexOf(marker), 1);
       // News box: enclosing componentkey ancestor. Games box has none; there
-      // the header <p> sits directly in the module container.
+      // the header <p> sits directly in the module container. closest() is
+      // unbounded, so discard matches at/above the aside — otherwise lf-news
+      // could land on a page-level wrapper and hide far more than the card.
       const el = walker.currentNode.parentElement;
-      const mod = el.closest("[componentkey]") || el.parentElement;
-      if (mod) mods.push({ mod, marker });
+      let mod = el.closest("[componentkey]");
+      if (!mod || mod === aside || !aside.contains(mod)) mod = el.parentElement;
+      if (mod && mod !== aside && aside.contains(mod)) mods.push({ mod, marker });
     }
     // News and games share one visual card; hiding the modules individually
     // leaves an empty card shell. Hide their common ancestor instead, unless
@@ -164,9 +178,11 @@ function scheduleScan() {
   requestAnimationFrame(() => {
     scheduled = false;
     applyState(); // path may have changed via SPA nav
-    markAdsClassic();
-    markAdsNewShell();
-    markNews();
+    if (currentState.hideAds) {
+      markAdsClassic();
+      markAdsNewShell();
+    }
+    if (currentState.hideNews) markNews();
   });
 }
 
@@ -180,30 +196,31 @@ api.storage.onChanged.addListener((changes, areaName) => {
       touched = true;
     }
   }
-  if (touched) applyState();
+  if (touched) {
+    applyState(); // immediately, no one-frame FOUC on toggle
+    scheduleScan(); // markers may need to (re)run, e.g. hideAds just turned on
+  }
 });
 
-// SPA navigation: LinkedIn swaps content without full reload.
-function hookHistory() {
-  const orig = history.pushState;
-  history.pushState = function (...args) {
-    const r = orig.apply(this, args);
-    scheduleScan();
-    return r;
-  };
-  window.addEventListener("popstate", scheduleScan);
-}
+// SPA navigation: LinkedIn swaps content without full reload. Patching
+// history.pushState would be useless here — content scripts run in an isolated
+// world, so the page's own pushState calls never hit a patched copy. Route
+// changes are picked up by the MutationObserver below (every nav swaps DOM;
+// applyState re-reads location.pathname per scan); popstate covers back/forward.
+window.addEventListener("popstate", scheduleScan);
 
 // Apply defaults synchronously at document_start (no FOUC), then reconcile with storage.
 applyState();
-hookHistory();
 
 const observer = new MutationObserver(() => scheduleScan());
 observer.observe(document.documentElement, { childList: true, subtree: true });
 
-Promise.resolve(api.storage.local.get(DEFAULTS))
+// get(DEFAULTS) fills in missing keys with the defaults and returns a Promise
+// on every supported target (Safari, Chrome MV3).
+api.storage.local
+  .get(DEFAULTS)
   .then((stored) => {
-    currentState = { ...DEFAULTS, ...stored };
+    currentState = stored;
     scheduleScan();
   })
   .catch((e) => log("storage read failed", e));

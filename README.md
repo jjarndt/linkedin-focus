@@ -32,8 +32,8 @@ and persisted in `storage.local`:
   `document_start`, so hidden elements never paint.
 - **JS-flagged elements.** Where LinkedIn offers no stable CSS anchor, promoted
   posts and right-rail modules are detected in JavaScript (a `MutationObserver`
-  plus a `pushState`/`popstate` rescan for SPA navigation) and flagged with
-  `.lf-ad` / `.lf-news`.
+  plus a `popstate` rescan; SPA navigations are picked up via the DOM swap they
+  cause) and flagged with `.lf-ad` / `.lf-news`.
 - **Two DOM shells.** LinkedIn serves either a newer React shell (feed, profiles)
   or a classic Ember shell (messaging). Both selector sets are kept, so whichever
   is served, one of them matches.
@@ -58,6 +58,7 @@ and why.
 ```
 extension/            # the extension source (a plain WebExtension)
   manifest.json
+  shared.js           # feature table (defaults), loaded by content script + popup
   content.js
   styles.css
   popup/popup.html | popup.css | popup.js
