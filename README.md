@@ -6,8 +6,16 @@ use messaging and profiles without the pull of the timeline. Everything is
 controlled by four independent toggles in the popup, and the default is
 "everything hidden" (focus mode).
 
+[![CI](https://github.com/jjarndt/linkedin-focus/actions/workflows/ci.yml/badge.svg)](https://github.com/jjarndt/linkedin-focus/actions/workflows/ci.yml)
+
 > Not affiliated with, endorsed by, or connected to LinkedIn or Microsoft. See
 > the [disclaimer](#disclaimer) below.
+
+<!--
+There is no demo GIF yet. A short recording of the popup toggles taking effect
+on a LinkedIn tab belongs here, above the Features section — "does this
+interest me" is decided before "do I install this".
+-->
 
 ## Features
 
@@ -22,6 +30,73 @@ and persisted in `storage.local`:
   right sidebar.
 - **Notification badges** — the red counters in the top navigation. The nav
   itself stays fully clickable.
+
+## Scope
+
+LinkedIn Focus does exactly one thing: it hides four groups of LinkedIn UI
+elements in Safari on macOS, switched by four toggles.
+
+Anything that serves that sentence is welcome. Everything else is listed below.
+
+## Non-Goals
+
+These are things LinkedIn Focus deliberately does not do. They are not open
+TODOs, they are decisions — proposals for them are closed without further
+discussion.
+
+- **No Chrome or Firefox build.** The shipped artifact is a Safari app
+  extension. The build step is Apple's `safari-web-extension-converter` invoked
+  with `--macos-only`, and `sync.sh` only knows how to find the Resources
+  directory inside the generated Xcode project. The sources use plain
+  WebExtension APIs (`globalThis.browser ?? globalThis.chrome`) and may well
+  load elsewhere, but nothing here is built, signed, or verified against another
+  browser.
+- **No user-configurable selectors.** Every selector is a constant in
+  `extension/content.js` and `extension/styles.css`. `storage.local` holds
+  exactly the four booleans declared in `extension/shared.js` and nothing else;
+  taking selectors from storage would mean executing user-supplied queries and
+  CSS against LinkedIn pages. Beyond that, every option doubles the number of
+  states that have to be tested and documented.
+- **No network access and no telemetry.** The manifest requests the single
+  permission `storage`, declares no `host_permissions` and no background script,
+  and the code contains no `fetch`, `XMLHttpRequest`, or `sendBeacon`. Nothing
+  leaves the browser, so there is nothing to opt out of.
+- **No features beyond the four toggles.** The feature table in `shared.js` and
+  the class map in `content.js` have exactly four entries, and each one maps to
+  a single class on `<html>`. Keyword muting, per-author filters, usage timers,
+  or schedules would need state and UI that this design does not have.
+- **No App Store distribution.** Signing is local free provisioning with a
+  Personal Team, as described under [Signing & running](#signing--running).
+  Store distribution needs a paid membership and a review process; building it
+  yourself from source is the intended path.
+
+If one of these boundaries is in the way of a concrete use case, a fork is the
+right way forward. The license explicitly allows it.
+
+## Quickstart
+
+macOS with Safari and Xcode installed. From nothing to a generated Safari
+project:
+
+```sh
+git clone https://github.com/jjarndt/linkedin-focus.git
+cd linkedin-focus
+
+xcrun safari-web-extension-converter extension \
+  --project-location SafariProject \
+  --app-name "LinkedIn Focus" \
+  --bundle-identifier com.example.linkedinfocus \
+  --macos-only --no-open --copy-resources
+```
+
+Pick your own reverse-DNS bundle identifier instead of `com.example.*`. This
+writes the `SafariProject/` Xcode project (gitignored) from the contents of
+`extension/`.
+
+The remaining steps happen in Xcode and Safari and are described under
+[Signing & running](#signing--running): select your Personal Team on both
+targets, `Cmd-R`, then enable the extension in Safari's settings and allow it on
+`linkedin.com`.
 
 ## How it works
 
@@ -75,8 +150,9 @@ sync.sh               # rsync extension/ -> SafariProject Resources
 
 ## Build
 
-Wrap the WebExtension in a Safari app container using Apple's converter. Pick your
-own reverse-DNS bundle identifier:
+The same command as in the [Quickstart](#quickstart), with its context: it wraps
+the WebExtension in a Safari app container using Apple's converter. Pick your own
+reverse-DNS bundle identifier:
 
 ```sh
 xcrun safari-web-extension-converter extension \

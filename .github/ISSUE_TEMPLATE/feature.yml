@@ -1,0 +1,85 @@
+name: Feature request
+description: Suggest a change in scope for LinkedIn Focus
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: read what the extension deliberately does not do, under
+        [Non-Goals](https://github.com/jjarndt/linkedin-focus#non-goals) in the
+        README and under
+        ["Proposing a change"](https://github.com/jjarndt/linkedin-focus/blob/main/.github/CONTRIBUTING.md#proposing-a-change).
+
+        In short, and each one is a decision rather than an open TODO: no
+        browser other than Safari on macOS, no site other than LinkedIn, no
+        settings beyond the four toggles, no App Store build, and no network
+        access of any kind. Requests for these are closed with a link to that
+        section rather than a discussion.
+
+        This project is in maintenance mode: it works and is touched when it
+        needs touching, with no time budget behind it and no promised reply. A
+        request can be well argued and still be declined, because a merged
+        change transfers its maintenance permanently to a project that has no
+        capacity reserved for it. Forking is an accepted outcome and the MIT
+        licence exists for it.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I read the non-goals above and this request is not one of them
+          required: true
+        - label: I searched existing issues and discussions for the same request
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: |
+        Describe the situation you are actually in, not the solution you have
+        in mind. What did you try to do on LinkedIn, and where did the
+        extension stop helping.
+      placeholder: When I try to ..., I have to ... because ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What should happen instead. If it is a new toggle, say what exactly it would hide and on which pages.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: |
+        Existing toggles, a user stylesheet, another extension, or simply
+        avoiding the page. If a workaround exists and is merely inconvenient,
+        say so. That is useful information, not a weakness of the request.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: How would this be delivered
+      options:
+        - I am proposing it, someone else would implement it
+        - I would like to implement it myself if it is accepted
+        - I would prefer to maintain it outside this project (fork)
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Links, prior art in other extensions, screenshots with personal content removed.
+    validations:
+      required: false

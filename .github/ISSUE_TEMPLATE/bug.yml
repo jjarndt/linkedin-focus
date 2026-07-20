@@ -1,0 +1,148 @@
+name: Bug report
+description: Report incorrect behaviour, with the debug output that shows it
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a report.
+
+        Before you continue:
+
+        - Questions, setup and Xcode signing help belong in
+          [Discussions](https://github.com/jjarndt/linkedin-focus/discussions),
+          not here.
+        - Security problems must not be reported here. See the
+          [security policy](https://github.com/jjarndt/linkedin-focus/security/policy).
+        - This project is in maintenance mode. Reports are read, but there is no
+          promised response time. See
+          [CONTRIBUTING](https://github.com/jjarndt/linkedin-focus/blob/main/.github/CONTRIBUTING.md).
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I can still reproduce this after reloading the LinkedIn tab
+          required: true
+        - label: The extension is enabled for linkedin.com in Safari settings (Always Allow)
+          required: true
+
+  - type: dropdown
+    id: version
+    attributes:
+      label: Version
+      description: The extension version you reproduced this on, as shown in extension/manifest.json. If it is not listed, update first and check again.
+      options:
+        - "1.0.0"
+        - "built from main"
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      description: For example "macOS 15.3".
+      placeholder: macOS 15.3
+    validations:
+      required: true
+
+  - type: input
+    id: safari
+    attributes:
+      label: Safari version
+      description: Safari > About Safari. For example "Safari 18.3".
+      placeholder: Safari 18.3
+    validations:
+      required: true
+
+  - type: dropdown
+    id: feature
+    attributes:
+      label: Which toggle is affected
+      options:
+        - Feed / Timeline
+        - Ads
+        - News & Games
+        - Notification badges
+        - The popup itself
+        - Several or none of the above
+    validations:
+      required: true
+
+  - type: input
+    id: page
+    attributes:
+      label: Where on LinkedIn
+      description: The kind of page, not a link with your account in it. For example "feed", "messaging", "someone's profile", "notifications".
+      placeholder: feed
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: Describe the observed behaviour, and what you expected instead.
+      placeholder: |
+        Expected: ...
+        Actual: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: debug
+    attributes:
+      label: Debug output
+      description: |
+        LinkedIn is behind a login, so a public reproducer link is impossible.
+        The debug log takes its place. In the browser console on linkedin.com run
+
+            localStorage.setItem('lfDebug', '1');
+
+        then reload the page, trigger the problem, and paste the
+        `[LinkedIn Focus]` lines here. They say what matched and why.
+
+        This field decides whether the report can be acted on. Without it the
+        work of reconstructing the page state moves to the maintainer, and the
+        report is likely to sit unanswered.
+
+        Remove anything personal before pasting: names, your own posts, URLs
+        containing your account.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: element
+    attributes:
+      label: The element involved
+      description: |
+        If something was not hidden that should have been (or was hidden that
+        should not have been), right-click it, Inspect Element, then copy the
+        outer HTML of the element and one or two of its parents. Strip post
+        text and names; the class and data attributes are what matters.
+      render: html
+    validations:
+      required: false
+
+  - type: input
+    id: language
+    attributes:
+      label: LinkedIn interface language
+      description: Ad detection matches label text in German and English, so the interface language matters.
+      placeholder: English
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Workarounds you found, when this last worked, related issues.
+    validations:
+      required: false

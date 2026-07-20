@@ -1,0 +1,13 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or support
+    url: https://github.com/jjarndt/linkedin-focus/discussions/categories/q-a
+    about: How-to questions, Xcode signing and setup help, and anything that is not a confirmed defect. Issues opened for this will be converted to a discussion.
+
+  - name: Idea or general discussion
+    url: https://github.com/jjarndt/linkedin-focus/discussions/categories/ideas
+    about: Discuss an idea before it becomes a feature request. Cheaper for you than writing code that gets declined.
+
+  - name: Report a security vulnerability
+    url: https://github.com/jjarndt/linkedin-focus/security/advisories/new
+    about: Never report a security problem in a public issue. Use private vulnerability reporting.
