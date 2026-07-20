@@ -1,0 +1,13 @@
+{
+  "name": "linkedin-focus",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Test harness for the LinkedIn Focus Safari Web Extension. The extension itself ships from extension/ and has no build step.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0"
+  }
+}
