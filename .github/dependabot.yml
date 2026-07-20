@@ -1,0 +1,107 @@
+# Dependabot Version Updates.
+#
+# Wichtigste Abgrenzung: Dependabot Alerts, Security Updates und Version
+# Updates sind drei getrennte Dinge. Diese Datei steuert ausschliesslich
+# Version Updates. Security Updates werden durch einen bestehenden Alert
+# ausgeloest, nicht durch einen Zeitplan, und sie umgehen den Cooldown
+# vollstaendig. Die einzigen Stellschrauben hier, die auch auf Security Updates
+# wirken, sind "groups" mit "applies-to: security-updates" und "ignore". Wer den
+# Cooldown hochsetzt, verzoegert also keine Sicherheitsfixes.
+#
+# Cooldown gibt es auch ohne Konfiguration als Default von drei Tagen. Die Werte
+# unten setzen ihn bewusst hoeher, um nicht in den ersten Stunden nach einem
+# Release einzusteigen, in denen kompromittierte Pakete typischerweise entdeckt
+# und zurueckgezogen werden.
+#
+# Ohne Grouping erzeugt ein frisches Repo mehr Dependabot-PRs, als ein
+# Nebenprojekt reviewen kann; danach wird gar keiner mehr gelesen.
+
+version: 2
+
+updates:
+  # npm im Repo-Root. Die Extension selbst hat keinen Build-Step und keine
+  # Runtime-Dependencies; package.json und package-lock.json existieren
+  # ausschliesslich fuer die Testsuite (node --test mit jsdom). Praktisch
+  # bewegt sich hier also nur devDependencies.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    versioning-strategy: "auto"
+    labels:
+      - "dependencies"
+      - "javascript"
+    commit-message:
+      prefix: "fix(deps)"
+      prefix-development: "chore(deps-dev)"
+      include: "scope"
+    cooldown:
+      default-days: 7
+      semver-major-days: 21
+      semver-minor-days: 7
+      semver-patch-days: 3
+    groups:
+      # Ein PR fuer alle harmlosen Produktions-Updates.
+      production-minor-patch:
+        applies-to: version-updates
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      # Entwicklungsabhaengigkeiten getrennt, damit ein fehlgeschlagener
+      # Build-Tool-Bump keinen Produktions-Bump blockiert.
+      development:
+        applies-to: version-updates
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      # Greift nur, wenn ein Alert vorliegt. Der Cooldown oben gilt hier nicht.
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    # Major-Updates kommen bewusst einzeln, nicht gruppiert: sie brauchen
+    # ohnehin eine Einzelentscheidung.
+
+  # Actions immer mitpflegen. SHA-gepinnte Actions veralten sonst unbemerkt,
+  # und Pinned-Dependencies plus Dependency-Update-Tool sind zwei der
+  # billigsten Scorecard-Punkte ueberhaupt.
+  #
+  # Fallstrick: Dependabot hebt SHA-Pins auf den neuesten Commit, nicht auf den
+  # neuesten Release-Tag. Es kommen also auch PRs fuer reine README-Aenderungen
+  # der Action, und es kann ein nicht freigegebener Commit gezogen werden. Vor
+  # dem Merge den Trailing-Comment mit dem Tag gegen den neuen SHA pruefen;
+  # zizmors ref-version-mismatch faengt den Drift zwischen Kommentar und Hash.
+  #
+  # directory "/" ist fuer github-actions vorgeschrieben, auch wenn die
+  # Workflows in .github/workflows liegen. versioning-strategy steht bewusst
+  # nur beim npm-Block; fuer github-actions ist die Option nicht dokumentiert.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci(deps)"
+    cooldown:
+      default-days: 7
+    groups:
+      actions-all:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      actions-security:
+        applies-to: security-updates
+        patterns:
+          - "*"

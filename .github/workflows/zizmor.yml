@@ -1,0 +1,70 @@
+# zizmor auditiert die Workflow-Dateien dieses Repos selbst, also genau die
+# Fehlerklasse, die kein Linter der Anwendung findet. Die Regeln, die im Alltag
+# am haeufigsten greifen: artipacked (Job-Token bleibt im Checkout liegen),
+# template-injection, excessive-permissions, dangerous-triggers
+# (pull_request_target), cache-poisoning, secrets-inherit, unpinned-uses und
+# ref-version-mismatch.
+#
+# WICHTIG, und der haeufigste stille Fehler bei diesem Workflow:
+# vier Regeln brauchen Netzwerkzugriff auf die GitHub-API und laufen ohne
+# GH_TOKEN STILLSCHWEIGEND NICHT. Der Job wird gruen, obwohl diese Audits gar
+# nicht ausgefuehrt wurden:
+#
+#   - impostor-commit          Commit gehoert nicht zum behaupteten Repo
+#   - known-vulnerable-actions Action mit bekanntem Advisory
+#   - ref-confusion            mehrdeutige Ref zwischen Branch und Tag
+#   - stale-action-refs        Ref zeigt auf einen ueberholten Commit
+#
+# Deshalb steht GH_TOKEN unten im env-Block. Das ist kein optionales Extra,
+# sondern die halbe Supply-Chain-Abdeckung des Tools.
+#
+# Konfiguration optional in .github/zizmor.yml, ueber rules.<audit>.ignore
+# (Format datei.yml:zeile:spalte), disable und remap.severity. Personas:
+# regular (Default), pedantic, auditor. auditor meldet auch Konstruktionen, die
+# nur unter Zusatzannahmen ausnutzbar sind, und ist als Dauer-Gate zu laut.
+
+name: zizmor
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".github/actions/**"
+      - ".github/zizmor.yml"
+  schedule:
+    # Wochenlauf, damit neu veroeffentlichte Advisories auch ohne Commit
+    # auffallen. known-vulnerable-actions bewertet gegen eine Datenbank, die
+    # sich unabhaengig vom Repo aendert.
+    - cron: "40 3 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  zizmor:
+    name: Audit workflows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # SARIF-Upload ins Code Scanning
+      actions: read # nur fuer private Repos noetig, schadet hier nicht
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@6599ee8b7a49aef6a770f63d261d214911a7ce02 # v0.6.0
+        with:
+          persona: regular
+          min-severity: low
+        env:
+          # Ohne dieses Token laufen die vier Online-Audits oben stumm nicht.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+# Die Action laedt das SARIF-Ergebnis selbst ins Code Scanning hoch; deshalb
+# steht hier kein separater upload-sarif-Schritt. Wenn stattdessen die CLI
+# direkt aufgerufen wird (zizmor --format sarif . > results.sarif), muss
+# github/codeql-action/upload-sarif ergaenzt werden, ebenfalls SHA-gepinnt.

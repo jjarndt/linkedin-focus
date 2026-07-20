@@ -1,0 +1,82 @@
+# OpenSSF Scorecard.
+#
+# ZUR EINORDNUNG DES SCORES, bitte vor dem Interpretieren lesen:
+# Der Gesamtscore dieses Repos ist KEIN Qualitaetsmass und wird es nie werden.
+# linkedin-focus ist ein Ein-Personen-Projekt, und mindestens zwei Checks sind
+# unter dieser Voraussetzung strukturell unerreichbar:
+#
+#   - Code-Review (High, Gewicht 7,5) verlangt, dass Aenderungen von einer
+#     ANDEREN Person reviewt wurden. Ein Solo-Maintainer kann diesen Check nicht
+#     erfuellen, egal wie sauber gearbeitet wird. Der Punkteabzug ist dauerhaft.
+#   - Contributors (Low) verlangt Beitragende aus mehreren Organisationen.
+#
+# Ein Gesamtscore von z.B. 7 von 10 sagt hier also nichts ueber die Sorgfalt aus.
+# Aussagekraeftig sind ausschliesslich die EINZELNEN Checks im Security-Tab:
+# Token-Permissions, Pinned-Dependencies, Dangerous-Workflow, Branch-Protection,
+# Dependency-Update-Tool, Binary-Artifacts. Diese Datei existiert, um genau
+# diese Einzelbefunde regelmaessig sichtbar zu machen, nicht um eine Zahl zu
+# optimieren.
+#
+# Weitere Hinweise:
+#   - Der Workflow laeuft nur sinnvoll in einem public Repo.
+#   - "id-token: write" ist zwingend fuer publish_results. Ohne das Recht laeuft
+#     die Analyse, aber das Ergebnis wird nicht veroeffentlicht und das Badge
+#     bleibt leer.
+#   - "security-events: write" wird fuer den SARIF-Upload ins Code Scanning
+#     gebraucht. Damit landen die Findings im Security-Tab statt nur im Job-Log.
+#   - Der Default-GITHUB_TOKEN reicht und ist der empfohlene Weg. Ein PAT ist
+#     nur noetig bei klassischer Branch Protection, die der GITHUB_TOKEN nicht
+#     lesen darf, oder fuer den Webhooks-Check. Wer Rulesets statt klassischer
+#     Branch Protection nutzt, kommt beim Branch-Protection-Check ohne PAT aus.
+#
+# Badge fuers README:
+#   [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/jjarndt/linkedin-focus/badge)](https://scorecard.dev/viewer/?uri=github.com/jjarndt/linkedin-focus)
+
+name: Scorecard
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Woechentlich. Die unrunde Uhrzeit verteilt die Last besser als eine volle
+    # Stunde.
+    - cron: "30 1 * * 6"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write # SARIF-Upload ins Code Scanning
+      id-token: write # OIDC, zwingend fuer publish_results
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # Veroeffentlicht das Ergebnis fuer das Badge und die Public API.
+          # Auf false setzen, wenn der Score nicht oeffentlich sein soll; dann
+          # kann id-token: write oben entfallen.
+          publish_results: true
+
+      - name: Upload results as artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scorecard-sarif
+          path: results.sarif
+          retention-days: 5
+
+      - name: Upload results to code scanning
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
+        with:
+          sarif_file: results.sarif

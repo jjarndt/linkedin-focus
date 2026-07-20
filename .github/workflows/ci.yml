@@ -1,0 +1,81 @@
+# CI fuer die Safari Web Extension.
+#
+# Warum diese Datei so aussieht:
+#
+#   - Top-level "permissions: {}" ist ein Whitelist-Reset, kein Delta: nicht
+#     genannte Rechte werden auf none gesetzt. Rechte gibt es ausschliesslich
+#     pro Job und nur so viel, wie der Job braucht.
+#   - "persist-credentials: false" bei jedem Checkout. Ohne das liegt das
+#     Job-Token im Arbeitsverzeichnis und landet in jedem Artefakt-Upload mit
+#     "path: ."; bei einem public Repo waere es damit oeffentlich abrufbar.
+#     Das ist zizmors Regel artipacked.
+#   - Alle Actions per Full-SHA gepinnt, Tag als Trailing-Comment. Der
+#     Kommentar bleibt stehen: Dependabot parst ihn, und zizmors
+#     ref-version-mismatch faengt spaeteren Drift zwischen Kommentar und Hash.
+#     Gesetzt mit "pinact run", nie von Hand abgetippt.
+#   - "pull_request", nicht "pull_request_target". pull_request_target laeuft im
+#     Kontext des Base-Repos mit einem Schreibtoken im Speicher und darf nie mit
+#     einem Checkout des PR-Head kombiniert werden.
+#   - Keine self-hosted Runner. Fuer public Repos gibt es keine
+#     Ephemeralitaets-Garantie, und genau diese Persistenz wurde in npm-Wuermern
+#     als Rueckweg genutzt.
+#
+# Bewusst NICHT enthalten:
+#
+#   - step-security/harden-runner. Das Egress-Filtering setzt eBPF-Hooks auf
+#     Kernel-Ebene und ist damit auf Linux-Runner beschraenkt. Dieser Workflow
+#     laeuft ausschliesslich auf macOS (Begruendung beim Job unten), dort gaebe
+#     es nichts zu haerten. Sobald ein Ubuntu-Job dazukommt, gehoert
+#     harden-runner mit "egress-policy: audit" als erster Step hinein.
+#   - Ein Lint-Job. Das Projekt hat aktuell weder Linter noch Formatter im
+#     package.json; ein Job, der nichts pruefen kann, waere ein gruenes Badge
+#     ohne Aussage.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions: {}
+
+concurrency:
+  # head_ref statt ref, weil ref bei PR-Events refs/pull/N/merge ist.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (Node ${{ matrix.node-version }})
+    # Bewusst nur macos-latest, keine Matrix ueber Betriebssysteme:
+    # Das Produkt ist eine Safari Web Extension fuer macOS. Ein Ubuntu- oder
+    # Windows-Runner wuerde eine Umgebung testen, in der die Extension gar nicht
+    # laeuft und in der auch niemand sie ausliefert. Die Testsuite haengt an
+    # jsdom und liefe dort zwar gruen, aber die gruene Farbe belegte nichts.
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # 24 ist die aktive LTS (Krypton), 26 die aktuelle Current-Linie.
+        # Lokal entwickelt wird derzeit auf 22 (Maintenance LTS); die Matrix
+        # laeuft bewusst voraus, damit ein Bruch vor dem Versionswechsel
+        # auffaellt und nicht danach.
+        node-version: ["24", "26"]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      # npm ci statt npm install: installiert exakt den package-lock.json und
+      # schlaegt fehl, wenn Lockfile und Manifest auseinanderlaufen.
+      - run: npm ci
+
+      - run: npm test
