@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Localization via `extension/_locales/`. English is the default locale, German
+  is a translation, and the browser picks one by system language. The popup text
+  and the manifest description are resolved through the `i18n` API instead of
+  being hardcoded German. The English wording stays inline in `popup.html` as a
+  fallback, so a missing message degrades to English rather than to a blank
+  label.
+
 ### Changed
 
 ### Deprecated

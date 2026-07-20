@@ -1,0 +1,30 @@
+{
+  "appDescription": {
+    "message": "Blendet Feed, Werbung, News und Benachrichtigungs-Badges auf LinkedIn aus, damit du fokussiert bleibst.",
+    "description": "Extension description, shown in the manifest and in Safari's extension settings."
+  },
+  "appName": {
+    "message": "LinkedIn Focus",
+    "description": "Product name. Shown as the popup document title and heading. Not translated — it is a proper noun."
+  },
+  "popupHint": {
+    "message": "An = ausgeblendet (Fokus)",
+    "description": "Explains the toggle direction: a toggle that is on hides the corresponding element."
+  },
+  "toggleAds": {
+    "message": "Werbung",
+    "description": "Toggle label: promoted posts and sidebar advertisements."
+  },
+  "toggleBadges": {
+    "message": "Notification-Badges",
+    "description": "Toggle label: the red counters in the top navigation."
+  },
+  "toggleFeed": {
+    "message": "Feed / Timeline",
+    "description": "Toggle label: the center column on the feed route."
+  },
+  "toggleNews": {
+    "message": "News & Spiele",
+    "description": "Toggle label: the LinkedIn News module and the daily-games box."
+  }
+}

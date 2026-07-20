@@ -133,6 +133,7 @@ and why.
 ```
 extension/            # the extension source (a plain WebExtension)
   manifest.json
+  _locales/en | de    # UI strings; en is the default locale
   shared.js           # feature table (defaults), loaded by content script + popup
   content.js
   styles.css
