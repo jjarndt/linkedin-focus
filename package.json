@@ -8,6 +8,6 @@
     "test": "node --test \"test/*.test.js\""
   },
   "devDependencies": {
-    "jsdom": "^29.1.1"
+    "jsdom": "^30.0.1"
   }
 }
