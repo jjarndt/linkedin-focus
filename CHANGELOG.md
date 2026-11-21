@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use English for the popup and Safari's extension description on all systems.
   Promoted posts are still detected on English and German LinkedIn pages.
-- Add a tested temporary Safari download, an installation guide, and an ad filter FAQ.
+- Add a tested temporary Safari download and document setup and ad filtering in the README.
 
 ## [1.0.1] - 2026-11-21
 

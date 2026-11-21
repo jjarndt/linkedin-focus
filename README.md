@@ -13,7 +13,7 @@ default.
 
 ![Illustrated demo of LinkedIn Focus hiding ads, news and games, notification badges, and the feed while keeping navigation visible](docs/linkedin-focus-demo.gif)
 
-[Try in Safari](#try-in-safari) · [Safari guide](https://jjarndt.github.io/linkedin-focus/) · [Build with Xcode](#quickstart)
+[Try in Safari](#try-in-safari) · [Build with Xcode](#quickstart)
 
 ## Features
 
