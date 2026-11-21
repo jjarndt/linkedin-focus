@@ -1,9 +1,7 @@
 // LinkedIn Focus popup: reads/writes storage.local; content scripts react via
 // onChanged. DEFAULTS comes from shared.js (loaded first in popup.html).
 //
-// One async pass: set each checkbox from storage, THEN attach its listener.
-// Wiring before the read resolves would let a click write storage and then be
-// visually reverted by the stale snapshot.
+// Checkboxes stay disabled until the stored state has loaded.
 
 const api = globalThis.browser ?? globalThis.chrome;
 
@@ -27,14 +25,35 @@ function localize() {
   if (uiLocale) document.documentElement.lang = uiLocale.replace(/_/g, "-");
 }
 
+async function refreshActiveTab() {
+  const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+  if (tab?.id != null) await api.tabs.sendMessage(tab.id, REFRESH_SETTINGS);
+}
+
 async function init() {
   const state = await api.storage.local.get(DEFAULTS);
   for (const key of Object.keys(DEFAULTS)) {
     const el = document.getElementById(key);
-    el.checked = state[key];
-    el.addEventListener("change", () => {
-      api.storage.local.set({ [key]: el.checked });
+    let savedValue = coerce(key, state[key]);
+    el.checked = savedValue;
+    el.addEventListener("change", async () => {
+      const value = el.checked;
+      el.disabled = true;
+      try {
+        await api.storage.local.set({ [key]: value });
+        savedValue = value;
+      } catch (e) {
+        el.checked = savedValue;
+        console.error("[LinkedIn Focus] popup update failed", e);
+        return;
+      } finally {
+        el.disabled = false;
+      }
+      refreshActiveTab().catch(() => {
+        // There may be no receiver if the active tab is outside LinkedIn.
+      });
     });
+    el.disabled = false;
   }
 }
 

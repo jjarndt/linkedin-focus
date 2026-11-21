@@ -181,6 +181,18 @@ test("findMarkedModules consumes each marker at most once", async () => {
   h.close();
 });
 
+test("a mention in another widget does not displace the news title", async (t) => {
+  const h = await loadExtension({
+    body: `<aside>
+      <div id="jobs" componentkey="jobs"><p>Mehr bei LinkedIn News</p></div>
+      <div id="news" componentkey="news"><h2>LinkedIn News</h2></div>
+    </aside>`,
+  });
+  t.after(h.close);
+
+  assert.deepEqual(marked(h), ["news"]);
+});
+
 test("findMarkedModules empties the pending array it is handed", async () => {
   const h = await fixture(`
     <aside id="rail"><div componentkey="a"><p>LinkedIn News</p></div></aside>
@@ -326,6 +338,21 @@ test("markNews leaves an iframe-bearing card visible", async () => {
   assert.equal(h.document.getElementById("card").classList.contains("lf-news"), false, "hiding the card would take the iframe with it");
   assert.deepEqual(marked(h), ["news", "games"], "only the two modules are marked");
   h.close();
+});
+
+test("news and games leave an unrelated widget in their layout wrapper visible", async (t) => {
+  const h = await loadExtension({
+    body: `<aside>
+      <div id="layout">
+        <div id="news" componentkey="news"><p>LinkedIn News</p></div>
+        <div id="games" componentkey="games"><p>Today's games</p></div>
+        <div id="jobs" componentkey="jobs"><p>Recommended jobs</p></div>
+      </div>
+    </aside>`,
+  });
+  t.after(h.close);
+
+  assert.deepEqual(marked(h), ["news", "games"]);
 });
 
 test("collapseToSharedCard leaves a single module untouched", async () => {
@@ -489,6 +516,22 @@ test("markNews marks the news module reached through the scan loop", async () =>
 
   assert.deepEqual(marked(h), ["news"], "the default scan should mark the news module");
   h.close();
+});
+
+test("a right-rail wrapper reveals a replacement widget when news disappears", async (t) => {
+  const h = await loadExtension({
+    body: `<aside>
+      <div id="widget-slot"><div componentkey="news"><p>LinkedIn News</p></div></div>
+    </aside>`,
+  });
+  t.after(h.close);
+  const slot = h.document.getElementById("widget-slot");
+  assert.deepEqual(marked(h), ["widget-slot"]);
+
+  slot.innerHTML = '<div componentkey="jobs"><p>Recommended jobs</p></div>';
+  await h.flush();
+
+  assert.deepEqual(marked(h), []);
 });
 
 test("markNews does not run while hideNews is off", async () => {

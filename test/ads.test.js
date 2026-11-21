@@ -75,6 +75,18 @@ test("classic shell reads the sub-description header too", async () => {
   h.close();
 });
 
+test("classic shell checks a promoted sub-description after an ordinary actor header", async (t) => {
+  const h = await loadExtension({
+    body: `<div class="feed-shared-update-v2" data-id="urn:li:activity:21">
+      <div class="update-components-actor__meta">Acme Corp</div>
+      <div class="update-components-actor__sub-description">Promoted</div>
+    </div>`,
+  });
+  t.after(h.close);
+
+  assert.equal(isAd(h.document.querySelector('[data-id="urn:li:activity:21"]')), true);
+});
+
 // ---- classic shell: hydration retry ----------------------------------------
 
 test("classic shell re-checks a post whose actor header hydrates later", async () => {
@@ -241,6 +253,20 @@ test("new shell re-checks a skeleton post once it hydrates", async () => {
   h.lf.markAdsNewShell();
   assert.equal(isAd(post), true, "skeleton was memoised and never re-checked after hydration");
   h.close();
+});
+
+test("new shell marks a promoted label added after the post body loads", async (t) => {
+  const h = await loadExtension({
+    body: newShellFeed([newShellPost({ mountId: "partial" })]),
+  });
+  t.after(h.close);
+  const post = h.document.querySelector('[data-lazy-mount-id="partial"]');
+  assert.equal(isAd(post), false);
+
+  post.insertAdjacentHTML("beforeend", "<span>Sponsored</span>");
+  await h.flush();
+
+  assert.equal(isAd(post), true);
 });
 
 test("page-set data-lf-checked cannot hide a promoted post in the new shell", async () => {
