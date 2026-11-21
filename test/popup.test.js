@@ -69,6 +69,8 @@ function makeI18nApi(messages, uiLocale) {
 function makeStorageApi(initial, { failGet = null } = {}) {
   const data = { ...initial };
   const setCalls = [];
+  const sentMessages = [];
+  let nextWriteError;
   let releaseGet;
   const getGate = new Promise((resolve) => {
     releaseGet = resolve;
@@ -76,6 +78,14 @@ function makeStorageApi(initial, { failGet = null } = {}) {
 
   return {
     api: {
+      tabs: {
+        async query(options) {
+          return options.active && options.currentWindow ? [{ id: 7 }] : [];
+        },
+        async sendMessage(tabId, message) {
+          sentMessages.push({ tabId, message, stored: { ...data } });
+        },
+      },
       storage: {
         local: {
           async get(defaults) {
@@ -85,15 +95,25 @@ function makeStorageApi(initial, { failGet = null } = {}) {
             for (const key of Object.keys(data)) out[key] = data[key];
             return out;
           },
-          async set(obj) {
+          set(obj) {
             setCalls.push({ ...obj });
+            if (nextWriteError) {
+              const result = Promise.reject(nextWriteError);
+              nextWriteError = undefined;
+              // Observe the mock rejection without consuming it for popup.js.
+              result.catch(() => {});
+              return result;
+            }
             Object.assign(data, obj);
+            return Promise.resolve();
           },
         },
       },
     },
     releaseGet,
     setCalls,
+    sentMessages,
+    failNextWrite: (error) => { nextWriteError = error; },
     raw: data,
   };
 }
@@ -127,7 +147,7 @@ async function loadPopup(opts = {}) {
   });
   const { window } = dom;
 
-  const { api, releaseGet, setCalls, raw } = makeStorageApi(storage, { failGet });
+  const { api, releaseGet, setCalls, sentMessages, failNextWrite, raw } = makeStorageApi(storage, { failGet });
   const { i18n, calls: i18nCalls } = makeI18nApi(messages ?? readLocale(locale), uiLocale);
   if (!noI18n) api.i18n = i18n;
   window.browser = api;
@@ -155,6 +175,8 @@ async function loadPopup(opts = {}) {
     window,
     document: window.document,
     setCalls,
+    sentMessages,
+    failNextWrite,
     storageData: raw,
     errors,
     flush,
@@ -218,6 +240,18 @@ test("stored values win over defaults, key by key", async () => {
   h.close();
 });
 
+test("invalid stored values show the same defaults the content script applies", async (t) => {
+  const h = await loadPopup({ storage: { hideFeed: null, hideAds: 0, hideNews: "", hideBadges: false } });
+  t.after(h.close);
+
+  assert.deepEqual(h.checkedState(), {
+    hideFeed: true,
+    hideAds: true,
+    hideNews: true,
+    hideBadges: false,
+  });
+});
+
 test("toggling a checkbox writes only that key", async () => {
   const h = await loadPopup({ storage: {} });
   h.box("hideNews").click(); // true -> false
@@ -251,25 +285,24 @@ test("each checkbox is bound to its own key", async () => {
   h.close();
 });
 
-test("a click before the storage read resolves does not write", async () => {
-  // The ordering guarantee from popup.js: listeners are attached only after the
-  // read settles, so a click landing in that window cannot persist a state that
-  // the incoming snapshot is about to overwrite.
+test("the popup only accepts clicks after the storage read resolves", async (t) => {
   const h = await loadPopup({ storage: { hideFeed: false }, autoResolveGet: false });
+  t.after(h.close);
 
   const el = h.box("hideFeed");
   assert.equal(el.checked, false, "markup starts unchecked before init() runs");
-  el.click(); // user flips it to true while the read is still in flight
+  el.click();
   await h.flush();
 
-  assert.deepEqual(h.setCalls, [], "no listener may be attached yet, so nothing may be written");
+  assert.equal(el.checked, false, "a click during loading must not show a state that cannot be saved");
+  assert.deepEqual(h.setCalls, [], "nothing may be written while storage is loading");
 
   h.resolveInitialGet();
   await h.flush();
 
-  assert.equal(el.checked, false, "the storage snapshot must win over the premature click");
+  assert.equal(el.disabled, false, "the checkbox must become usable after loading");
+  assert.equal(el.checked, false, "the checkbox must show the storage snapshot");
   assert.deepEqual(h.setCalls, [], "the snapshot must not be written back either");
-  h.close();
 });
 
 test("clicks after the read resolves are wired up", async () => {
@@ -285,9 +318,10 @@ test("clicks after the read resolves are wired up", async () => {
   h.close();
 });
 
-test("a failing storage read is caught and logged", async () => {
+test("a failing storage read keeps the popup controls disabled and is logged", async (t) => {
   const boom = new Error("storage unavailable");
   const h = await loadPopup({ failGet: boom });
+  t.after(h.close);
 
   assert.equal(h.errors.length, 1, "the rejection must be reported exactly once");
   const [prefix, err] = h.errors[0];
@@ -303,8 +337,39 @@ test("a failing storage read is caught and logged", async () => {
   );
   h.box("hideFeed").click();
   await h.flush();
-  assert.deepEqual(h.setCalls, [], "no listeners exist after a failed init");
-  h.close();
+  assert.equal(h.box("hideFeed").checked, false, "a failed read must not leave an apparently working toggle");
+  assert.deepEqual(h.setCalls, [], "no change can be saved after a failed init");
+});
+
+test("a failed storage write restores the last saved value and allows retrying", async (t) => {
+  const h = await loadPopup({ storage: { hideFeed: true } });
+  t.after(h.close);
+
+  h.failNextWrite(new Error("storage unavailable"));
+  h.box("hideFeed").click();
+  await h.flush();
+
+  assert.equal(h.storageData.hideFeed, true, "precondition: the failed write did not change storage");
+  assert.equal(h.box("hideFeed").checked, true, "the popup must still show the last saved value");
+  assert.equal(h.box("hideFeed").disabled, false, "the toggle must be usable again");
+  assert.deepEqual(h.sentMessages, [], "a failed write must not request a refresh");
+
+  h.box("hideFeed").click();
+  await h.flush();
+
+  assert.equal(h.storageData.hideFeed, false, "retrying must persist the new selection");
+});
+
+test("saving a setting refreshes the active tab after the write", async (t) => {
+  const h = await loadPopup();
+  t.after(h.close);
+
+  h.box("hideFeed").click();
+  await h.flush();
+
+  assert.deepEqual(h.sentMessages, [
+    { tabId: 7, message: "refreshSettings", stored: { hideFeed: false } },
+  ]);
 });
 
 // --- Localization -----------------------------------------------------------

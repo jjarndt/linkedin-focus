@@ -30,5 +30,48 @@ fi
 MANIFEST="$MATCHES"
 
 DEST="$(dirname "$MANIFEST")"
+PROJECT_DIR="$(dirname "$(dirname "$DEST")")"
+PROJECT="$PROJECT_DIR/$(basename "$PROJECT_DIR").xcodeproj/project.pbxproj"
+
+if [[ ! -f "$PROJECT" ]]; then
+  echo "Error: no Xcode project found at $PROJECT." >&2
+  exit 1
+fi
+
+# rsync cannot add new top-level resources to the converter's build phase.
+EXTENSION_TARGET="$(basename "$(dirname "$DEST")")"
+plutil -convert xml1 -o - "$PROJECT" | /usr/bin/python3 -c '
+import plistlib
+import sys
+from pathlib import Path
+
+source, target_name = sys.argv[1:]
+objects = plistlib.loads(sys.stdin.buffer.read())["objects"]
+target = next((
+    obj for obj in objects.values()
+    if obj["isa"] == "PBXNativeTarget" and obj["name"] == target_name
+), None)
+if target is None:
+    sys.exit(f"Error: Xcode target {target_name} not found.")
+
+bundled = set()
+for phase_id in target["buildPhases"]:
+    phase = objects[phase_id]
+    if phase["isa"] != "PBXResourcesBuildPhase":
+        continue
+    for file_id in phase["files"]:
+        reference = objects[objects[file_id]["fileRef"]]
+        bundled.add(Path(reference["path"]).name)
+
+missing = sorted(
+    path.name for path in Path(source).iterdir()
+    if not path.name.startswith(".") and path.name not in bundled
+)
+if missing:
+    print("Error: the Xcode project does not bundle these extension resources:", file=sys.stderr)
+    print("  " + "\n  ".join(missing), file=sys.stderr)
+    sys.exit("Add them to the Copy Bundle Resources phase of the extension target or regenerate the Xcode project before syncing.")
+' "$SRC" "$EXTENSION_TARGET"
+
 rsync -av --delete "$SRC" "$DEST/"
 echo "Synced extension/ -> $DEST"

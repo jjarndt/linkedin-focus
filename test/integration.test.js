@@ -67,6 +67,58 @@ test("turning a toggle back on re-applies its class", async () => {
   h.close();
 });
 
+test("returning to a tab applies storage changes missed in the background", async (t) => {
+  const h = await loadExtension({ storage: { hideFeed: false } });
+  t.after(h.close);
+  let visibility = "hidden";
+  Object.defineProperty(h.document, "visibilityState", { get: () => visibility });
+
+  h.document.dispatchEvent(new h.window.Event("visibilitychange"));
+  h.storageData.hideFeed = true; // Saved in another tab without a delivered storage event.
+  assert.equal(h.htmlClasses().has("lf-hide-feed"), false);
+
+  visibility = "visible";
+  h.document.dispatchEvent(new h.window.Event("visibilitychange"));
+  await h.flush();
+
+  assert.ok(h.htmlClasses().has("lf-hide-feed"), "the visible tab kept the old feed setting");
+});
+
+test("overlapping tab refreshes preserve the latest snapshot and live changes", async (t) => {
+  const h = await loadExtension({ storage: { hideFeed: false } });
+  t.after(h.close);
+  Object.defineProperty(h.document, "visibilityState", { value: "visible" });
+  const reads = [];
+  h.storage.local.get = (defaults) => {
+    const snapshot = { ...defaults, ...h.storageData };
+    return new Promise((resolve) => reads.push(() => resolve(snapshot)));
+  };
+
+  h.document.dispatchEvent(new h.window.Event("visibilitychange"));
+  h.storageData.hideFeed = true;
+  h.document.dispatchEvent(new h.window.Event("visibilitychange"));
+  await h.storage.local.set({ hideAds: false });
+
+  reads[1]();
+  await h.flush();
+  reads[0]();
+  await h.flush();
+
+  assert.ok(h.htmlClasses().has("lf-hide-feed"));
+  assert.equal(h.htmlClasses().has("lf-hide-ads"), false);
+});
+
+test("the active tab reconciles storage when the popup requests a refresh", async (t) => {
+  const h = await loadExtension();
+  t.after(h.close);
+  h.storageData.hideFeed = false;
+
+  h.emitMessage("refreshSettings");
+  await h.flush();
+
+  assert.equal(h.htmlClasses().has("lf-hide-feed"), false);
+});
+
 test("with hideAds off, promoted posts are never marked", async () => {
   const h = await loadExtension({
     body: promotedPost("urn:li:activity:1"),
@@ -181,6 +233,35 @@ test("a post injected into the DOM is picked up by the observer and marked", asy
   const post = h.document.querySelector('[data-id="urn:li:activity:99"]');
   assert.ok(post.classList.contains("lf-ad"), "post added after load was never scanned");
   h.close();
+});
+
+test("a news heading updated in place is picked up by the observer", async (t) => {
+  const h = await loadExtension({
+    body: `<aside><div componentkey="news-module"><h2>Loading…</h2></div></aside>`,
+  });
+  t.after(() => h.close());
+  const module = h.document.querySelector("[componentkey]");
+  assert.equal(module.classList.contains("lf-news"), false);
+
+  module.querySelector("h2").firstChild.data = "LinkedIn News";
+  await h.flush();
+
+  assert.ok(module.classList.contains("lf-news"), "hydrated news module stayed visible");
+});
+
+test("an existing feed recognized by a late data-testid is scanned", async (t) => {
+  const h = await loadExtension({
+    body: `<div id="feed"><div data-lazy-mount-id="ad-1"><span>Promoted</span></div></div>`,
+  });
+  t.after(() => h.close());
+  const feed = h.document.getElementById("feed");
+  const post = feed.firstElementChild;
+  assert.equal(post.classList.contains("lf-ad"), false);
+
+  feed.setAttribute("data-testid", "mainFeed");
+  await h.flush();
+
+  assert.ok(post.classList.contains("lf-ad"), "the existing promoted post was never scanned");
 });
 
 test("an organic post injected later stays unmarked", async () => {

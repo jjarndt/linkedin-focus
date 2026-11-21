@@ -34,14 +34,6 @@ function log(...args) {
 
 let currentState = { ...DEFAULTS };
 
-// storage.local.remove()/clear() fire onChanged with newValue undefined, and
-// classList.toggle(cls, undefined) treats the force argument as absent (WebIDL)
-// — it would flip the class on every scan instead of clearing it. Everything
-// entering currentState is therefore coerced against the DEFAULTS table.
-function coerce(key, value) {
-  return typeof value === "boolean" ? value : DEFAULTS[key];
-}
-
 // Classic shell reuses .scaffold-layout__main on profile/messaging pages, so the
 // feed rule there must be scoped to the feed route. The new shell needs no
 // scoping: [data-testid="mainFeed"] only exists on the feed.
@@ -85,21 +77,24 @@ const CLASSIC_HEADER_SELECTOR = [
 // The stored value is the post's identity (activity urn / mount id), not a bare
 // "1": if the shell ever recycles a container for a different post, the changed
 // identity forces a re-check and clears a stale lf-ad flag. WeakMap keys are
-// the post elements, so entries die with the nodes.
+// the post elements, so entries die with the nodes. The observer invalidates
+// entries when the contents of a post change without a new identity.
 const checked = new WeakMap();
 
 function markAdsClassic() {
   document.querySelectorAll(CLASSIC_POST_SELECTOR).forEach((post) => {
     const id = post.getAttribute("data-id") || post.getAttribute("data-urn") || "1";
     if (checked.get(post) === id) return;
-    const header = post.querySelector(CLASSIC_HEADER_SELECTOR);
-    if (!header) return; // not hydrated yet, retry on next scan
+    const headers = post.querySelectorAll(CLASSIC_HEADER_SELECTOR);
+    if (!headers.length) return; // not hydrated yet, retry on next scan
     checked.set(post, id);
-    post.classList.remove("lf-ad");
-    if (PROMOTED_RE.test(header.textContent || "")) {
-      post.classList.add("lf-ad");
-      log("ad (classic):", (header.textContent || "").trim().slice(0, 60));
-    }
+    const label = Array.from(headers, (header) => header.textContent.trim())
+      .find((text, index) => {
+        const match = PROMOTED_RE.exec(text);
+        return match && (index === 0 || match[0] === text);
+      });
+    post.classList.toggle("lf-ad", Boolean(label));
+    if (label) log("ad (classic):", label.slice(0, 60));
   });
 }
 
@@ -115,14 +110,17 @@ function markAdsNewShell() {
       const leaves = post.querySelectorAll("p, span");
       if (!leaves.length) return; // skeleton / not hydrated yet, retry on next scan
       checked.set(post, id);
-      post.classList.remove("lf-ad");
+      let label = "";
       for (const el of leaves) {
-        if (el.childElementCount === 0 && LABELS.has((el.textContent || "").trim())) {
-          post.classList.add("lf-ad");
-          log("ad (new shell):", (el.textContent || "").trim());
+        if (el.childElementCount !== 0) continue;
+        const text = el.textContent.trim();
+        if (LABELS.has(text)) {
+          label = text;
           break;
         }
       }
+      post.classList.toggle("lf-ad", Boolean(label));
+      if (label) log("ad (new shell):", label);
     });
 }
 
@@ -133,6 +131,7 @@ function markAdsNewShell() {
 // shell is handled purely in CSS. Scans are cheap (asides are small) and
 // classList.add is idempotent, so no checked-flag is needed.
 const NEWS_MARKERS = ["LinkedIn News", "Spiel des Tages", "Today's games"];
+let markedNews = new Set();
 
 // News box: enclosing componentkey ancestor. Games box has none; there the
 // header <p> sits directly in the module container. closest() is unbounded, so
@@ -143,27 +142,39 @@ function findMarkedModules(aside, pending) {
   const mods = [];
   const walker = document.createTreeWalker(aside, NodeFilter.SHOW_TEXT);
   while (walker.nextNode() && pending.length) {
-    const marker = pending.find((m) => walker.currentNode.textContent.includes(m));
-    if (!marker) continue;
-    pending.splice(pending.indexOf(marker), 1);
+    const marker = walker.currentNode.textContent.trim();
+    const index = pending.indexOf(marker);
+    if (index === -1) continue;
     const el = walker.currentNode.parentElement;
     let mod = el.closest("[componentkey]");
     if (!mod || mod === aside || !aside.contains(mod)) mod = el.parentElement;
-    if (mod && mod !== aside && aside.contains(mod)) mods.push({ mod, marker });
+    if (mod && mod !== aside && aside.contains(mod)) {
+      pending.splice(index, 1);
+      mods.push({ mod, marker });
+    }
   }
   return mods;
 }
 
 // News and games share one visual card; hiding the modules individually leaves
-// an empty card shell. Hide their common ancestor instead, unless it also wraps
-// unrelated content (ad iframe) or the whole aside.
+// an empty card shell. Hide their common ancestor only if the modules account
+// for the whole card.
+function containsOnlyModules(element, modules) {
+  if (modules.has(element)) return true;
+  return element.children.length > 0 && Array.from(element.childNodes).every((child) => {
+    if (child.nodeType === Node.ELEMENT_NODE) return containsOnlyModules(child, modules);
+    return child.nodeType !== Node.TEXT_NODE || !child.textContent.trim();
+  });
+}
+
 function collapseToSharedCard(mods, aside) {
   if (mods.length <= 1) return mods;
   let lca = mods[0].mod;
   while (lca !== aside && !mods.every(({ mod }) => lca.contains(mod))) {
     lca = lca.parentElement;
   }
-  if (lca === aside || lca.querySelector("iframe")) return mods;
+  const modules = new Set(mods.map(({ mod }) => mod));
+  if (lca === aside || lca.querySelector("iframe") || !containsOnlyModules(lca, modules)) return mods;
   return [{ mod: lca, marker: "news+games card" }];
 }
 
@@ -180,6 +191,7 @@ function outermostSingleChildWrapper(mod, aside) {
 }
 
 function markNews() {
+  const targets = new Set();
   for (const aside of document.querySelectorAll("aside")) {
     const text = aside.textContent || "";
     const pending = NEWS_MARKERS.filter((m) => text.includes(m));
@@ -187,12 +199,17 @@ function markNews() {
     const mods = collapseToSharedCard(findMarkedModules(aside, pending), aside);
     for (const { mod, marker } of mods) {
       const target = outermostSingleChildWrapper(mod, aside);
+      targets.add(target);
       if (!target.classList.contains("lf-news")) {
         target.classList.add("lf-news");
         log("right-rail module marked:", marker);
       }
     }
   }
+  for (const previous of markedNews) {
+    if (!targets.has(previous)) previous.classList.remove("lf-news");
+  }
+  markedNews = targets;
 }
 
 // ---- Scan scheduling -------------------------------------------------------
@@ -212,11 +229,25 @@ function scheduleScan() {
   });
 }
 
-// Keys the live listener has already applied. The initial read below resolves
-// *after* this listener is installed, so a toggle committed while the read is
-// in flight would otherwise be overwritten by the older snapshot — the tab
-// would keep rendering the pre-toggle state until the next toggle or reload.
-const liveKeys = new Set();
+let pendingReadKeys = null;
+
+async function refreshState() {
+  const liveKeys = new Set();
+  pendingReadKeys = liveKeys;
+  try {
+    const stored = await api.storage.local.get(DEFAULTS);
+    if (pendingReadKeys !== liveKeys) return;
+
+    for (const key of Object.keys(CLASS_MAP)) {
+      if (!liveKeys.has(key)) currentState[key] = coerce(key, stored[key]);
+    }
+    scheduleScan();
+  } catch (e) {
+    log("storage read failed", e);
+  } finally {
+    if (pendingReadKeys === liveKeys) pendingReadKeys = null;
+  }
+}
 
 // Live toggle: popup writes storage.local, every tab reacts here.
 api.storage.onChanged.addListener((changes, areaName) => {
@@ -225,7 +256,8 @@ api.storage.onChanged.addListener((changes, areaName) => {
   for (const key of Object.keys(CLASS_MAP)) {
     if (changes[key]) {
       currentState[key] = coerce(key, changes[key].newValue);
-      liveKeys.add(key);
+      // A pending snapshot must not overwrite a newer live value.
+      pendingReadKeys?.add(key);
       touched = true;
     }
   }
@@ -245,18 +277,26 @@ window.addEventListener("popstate", scheduleScan);
 // Apply defaults synchronously at document_start (no FOUC), then reconcile with storage.
 applyState();
 
-const observer = new MutationObserver(() => scheduleScan());
-observer.observe(document.documentElement, { childList: true, subtree: true });
+const observer = new MutationObserver((mutations) => {
+  for (const { target } of mutations) {
+    let element = target.nodeType === Node.ELEMENT_NODE ? target : target.parentElement;
+    for (; element; element = element.parentElement) checked.delete(element);
+  }
+  scheduleScan();
+});
+observer.observe(document.documentElement, {
+  childList: true,
+  characterData: true,
+  attributes: true,
+  attributeFilter: ["data-testid", "data-id", "data-urn", "data-lazy-mount-id", "componentkey"],
+  subtree: true,
+});
 
-// get(DEFAULTS) fills in missing keys with the defaults and returns a Promise
-// on every supported target (Safari, Chrome MV3).
-api.storage.local
-  .get(DEFAULTS)
-  .then((stored) => {
-    for (const key of Object.keys(CLASS_MAP)) {
-      if (liveKeys.has(key)) continue; // a live toggle already won this key
-      currentState[key] = coerce(key, stored[key]);
-    }
-    scheduleScan();
-  })
-  .catch((e) => log("storage read failed", e));
+// Catch up with changes a background tab may have missed.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") refreshState();
+});
+api.runtime.onMessage.addListener((message) => {
+  if (message === REFRESH_SETTINGS) refreshState();
+});
+refreshState();

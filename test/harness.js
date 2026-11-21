@@ -45,6 +45,7 @@ const EPILOGUE = `
 function makeStorageApi(initial, { getRejects = false } = {}) {
   const data = { ...initial };
   const listeners = [];
+  const messageListeners = [];
   let releaseGet;
   const getGate = new Promise((resolve) => {
     releaseGet = resolve;
@@ -56,6 +57,13 @@ function makeStorageApi(initial, { getRejects = false } = {}) {
 
   return {
     api: {
+      runtime: {
+        onMessage: {
+          addListener(fn) {
+            messageListeners.push(fn);
+          },
+        },
+      },
       storage: {
         local: {
           get(defaults) {
@@ -105,6 +113,7 @@ function makeStorageApi(initial, { getRejects = false } = {}) {
     releaseGet,
     raw: data,
     emit,
+    emitMessage: (message) => messageListeners.forEach((listener) => listener(message)),
   };
 }
 
@@ -136,7 +145,7 @@ export async function loadExtension(opts = {}) {
   const rafQueue = [];
   window.requestAnimationFrame = (fn) => rafQueue.push(fn);
 
-  const { api, releaseGet, raw, emit } = makeStorageApi(storage, { getRejects });
+  const { api, releaseGet, raw, emit, emitMessage } = makeStorageApi(storage, { getRejects });
   window.browser = api;
 
   const logs = [];
@@ -176,6 +185,7 @@ export async function loadExtension(opts = {}) {
     resolveInitialGet: releaseGet,
     /** Fire onChanged directly, e.g. with a non-"local" area to test the guard. */
     emitChange: emit,
+    emitMessage,
     /** Classes currently on <html>, as a Set. */
     htmlClasses: () => new Set(window.document.documentElement.classList),
     /** Pending rAF callback count — 0 means the scanner has settled. */
