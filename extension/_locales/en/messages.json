@@ -1,6 +1,6 @@
 {
   "appDescription": {
-    "message": "Hides the feed, ads, news and notification badges on LinkedIn so you can stay focused.",
+    "message": "Hide the LinkedIn feed, promoted posts, sidebar ads, news and games, and notification badges in Safari.",
     "description": "Extension description, shown in the manifest and in Safari's extension settings."
   },
   "appName": {
