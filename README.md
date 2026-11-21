@@ -11,11 +11,7 @@ controlled by four independent toggles in the popup, and the default is
 > Not affiliated with, endorsed by, or connected to LinkedIn or Microsoft. See
 > the [disclaimer](#disclaimer) below.
 
-<!--
-There is no demo GIF yet. A short recording of the popup toggles taking effect
-on a LinkedIn tab belongs here, above the Features section — "does this
-interest me" is decided before "do I install this".
--->
+![Illustrated demo of LinkedIn Focus hiding ads, news and games, notification badges, and the feed while keeping navigation visible](docs/linkedin-focus-demo.gif)
 
 ## Features
 
