@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How to hide the LinkedIn feed in Safari | LinkedIn Focus</title>
+  <meta name="description" content="Hide the LinkedIn feed, promoted posts, and sidebar ads in Safari on macOS with LinkedIn Focus, a free and open-source extension.">
+  <link rel="canonical" href="https://jjarndt.github.io/linkedin-focus/">
+  <meta property="og:title" content="How to hide the LinkedIn feed in Safari">
+  <meta property="og:description" content="An open-source Safari extension for hiding the LinkedIn feed, promoted posts, and notification badges.">
+  <meta property="og:url" content="https://jjarndt.github.io/linkedin-focus/">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://jjarndt.github.io/linkedin-focus/linkedin-focus-demo.gif">
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #102a43;
+      background: #f3f7fc;
+      line-height: 1.65;
+    }
+
+    * { box-sizing: border-box; }
+
+    body { margin: 0; }
+
+    main {
+      width: min(100% - 2rem, 58rem);
+      margin: 0 auto;
+      padding: clamp(2.5rem, 8vw, 5rem) 0 3rem;
+    }
+
+    .project {
+      color: #075aa6;
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    h1, h2 { line-height: 1.12; }
+
+    h1 {
+      max-width: 16ch;
+      margin: .65rem 0 1rem;
+      font-size: clamp(2.25rem, 6vw, 4.25rem);
+      letter-spacing: -.045em;
+    }
+
+    h2 { font-size: 1.45rem; }
+
+    p { max-width: 66ch; }
+
+    a {
+      color: #075aa6;
+      text-underline-offset: .2em;
+    }
+
+    a:focus-visible, summary:focus-visible {
+      outline: 2px solid #075aa6;
+      outline-offset: 4px;
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .75rem 1.25rem;
+      margin: 1.45rem 0 2rem;
+    }
+
+    .primary {
+      padding: .5rem .95rem;
+      border-radius: .4rem;
+      background: #0a66c2;
+      color: white;
+      font-weight: 650;
+      text-decoration: none;
+    }
+
+    .primary:hover { background: #07549f; }
+
+    details {
+      border: 1px solid #cddced;
+      border-radius: .7rem;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    summary {
+      padding: .85rem 1rem;
+      cursor: pointer;
+      font-weight: 650;
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    section {
+      margin-top: 2rem;
+      padding-top: .6rem;
+      border-top: 1px solid #cddced;
+    }
+
+    li + li { margin-top: .3rem; }
+
+    footer {
+      margin-top: 2rem;
+      color: #465d73;
+      font-size: .9rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <a class="project" href="https://github.com/jjarndt/linkedin-focus">LinkedIn Focus</a>
+      <h1>How to hide the LinkedIn feed in Safari</h1>
+      <p>LinkedIn Focus is a free, open-source Safari extension for macOS. Hide the home feed, promoted posts and sidebar ads, news and games, or notification badges. Messaging and profiles stay available.</p>
+    </header>
+    <nav aria-label="Project links">
+      <a class="primary" href="#try-in-safari">Try in Safari</a>
+      <a href="https://github.com/jjarndt/linkedin-focus">View source on GitHub</a>
+    </nav>
+    <details>
+      <summary>Show animated demo</summary>
+      <img src="linkedin-focus-demo.gif" width="980" height="448" loading="lazy" alt="An illustrated LinkedIn page changes as each filter is enabled. The feed, sidebar modules, and badges disappear while navigation stays visible.">
+    </details>
+    <section aria-labelledby="try-in-safari">
+      <h2 id="try-in-safari">Try in Safari without Xcode</h2>
+      <ol>
+        <li><a href="https://github.com/jjarndt/linkedin-focus/releases/download/v1.0.2/linkedin-focus-safari.zip">Download the Safari ZIP</a>.</li>
+        <li>In <strong>Safari → Settings → Advanced</strong>, enable <strong>Show features for web developers</strong>.</li>
+        <li>In the <strong>Developer</strong> tab, click <strong>Add Temporary Extension</strong>, confirm the unsigned extension prompt if shown, and select the ZIP.</li>
+        <li>Open LinkedIn, click <strong>LinkedIn Focus</strong> in the toolbar, and allow it to run on the site.</li>
+      </ol>
+      <p>Safari removes temporary extensions after 24 hours or when you quit. Follow the <a href="https://github.com/jjarndt/linkedin-focus#quickstart">Xcode quickstart</a> for a local build that persists across restarts.</p>
+    </section>
+    <section aria-labelledby="feed">
+      <h2 id="feed">Hide the home feed</h2>
+      <ol>
+        <li>On LinkedIn, click the LinkedIn Focus toolbar icon in Safari.</li>
+        <li>Turn on <strong>Feed / Timeline</strong>. The feed disappears without reloading the page.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="ads">
+      <h2 id="ads">Can I block LinkedIn ads and keep the feed?</h2>
+      <p>Yes. Turn on <strong>Ads</strong> and turn off <strong>Feed / Timeline</strong> in the popup. Promoted posts and sidebar ads are hidden while the feed stays visible.</p>
+    </section>
+    <footer>Independent project, unaffiliated with LinkedIn or Microsoft.</footer>
+  </main>
+</body>
+</html>

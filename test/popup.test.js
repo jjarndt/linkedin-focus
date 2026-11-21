@@ -12,13 +12,13 @@
 // are attached only after the read resolves — and that window has to be
 // observable to be testable.
 //
-// browser.i18n is stubbed from the SHIPPED extension/_locales/*/messages.json,
+// browser.i18n is stubbed from the shipped English messages.json,
 // not from a hand-written map, so a key that exists in popup.html but not in a
 // locale file fails here.
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { JSDOM } from "jsdom";
@@ -31,15 +31,13 @@ const POPUP_SRC = readFileSync(join(POPUP_DIR, "popup.js"), "utf8");
 const POPUP_HTML = readFileSync(join(POPUP_DIR, "popup.html"), "utf8");
 
 const LOCALES_DIR = join(ROOT, "extension", "_locales");
+const MANIFEST = JSON.parse(readFileSync(join(ROOT, "extension", "manifest.json"), "utf8"));
 
 const KEYS = ["hideFeed", "hideAds", "hideNews", "hideBadges"];
 
-/** Locales the extension ships, and the @@ui_locale each one would report. */
-const UI_LOCALES = { en: "en_US", de: "de_DE" };
-
 /** Flatten a shipped messages.json to { key: message }. */
-function readLocale(locale) {
-  const raw = JSON.parse(readFileSync(join(LOCALES_DIR, locale, "messages.json"), "utf8"));
+function readEnglishMessages() {
+  const raw = JSON.parse(readFileSync(join(LOCALES_DIR, "en", "messages.json"), "utf8"));
   return Object.fromEntries(Object.entries(raw).map(([key, entry]) => [key, entry.message]));
 }
 
@@ -125,8 +123,7 @@ function makeStorageApi(initial, { failGet = null } = {}) {
  * @param {object}  [opts.storage]  initial storage.local contents
  * @param {boolean} [opts.autoResolveGet=true] resolve the initial get immediately
  * @param {Error}   [opts.failGet]  make the initial get reject with this error
- * @param {string}  [opts.locale="en"] which shipped locale browser.i18n serves
- * @param {object}  [opts.messages] message map replacing the shipped locale
+ * @param {object}  [opts.messages] message map replacing the shipped English messages
  * @param {string}  [opts.uiLocale] what @@ui_locale reports
  * @param {boolean} [opts.noI18n=false] omit browser.i18n entirely
  */
@@ -135,9 +132,8 @@ async function loadPopup(opts = {}) {
     storage = {},
     autoResolveGet = true,
     failGet = null,
-    locale = "en",
     messages = null,
-    uiLocale = UI_LOCALES[locale],
+    uiLocale = "en_US",
     noI18n = false,
   } = opts;
 
@@ -148,7 +144,7 @@ async function loadPopup(opts = {}) {
   const { window } = dom;
 
   const { api, releaseGet, setCalls, sentMessages, failNextWrite, raw } = makeStorageApi(storage, { failGet });
-  const { i18n, calls: i18nCalls } = makeI18nApi(messages ?? readLocale(locale), uiLocale);
+  const { i18n, calls: i18nCalls } = makeI18nApi(messages ?? readEnglishMessages(), uiLocale);
   if (!noI18n) api.i18n = i18n;
   window.browser = api;
 
@@ -374,30 +370,20 @@ test("saving a setting refreshes the active tab after the write", async (t) => {
 
 // --- Localization -----------------------------------------------------------
 
-test("both shipped locales define exactly the same keys", () => {
-  const en = readLocale("en");
-  const de = readLocale("de");
-  assert.deepEqual(
-    Object.keys(en).sort(),
-    Object.keys(de).sort(),
-    "a key present in one locale and missing in the other silently ships untranslated UI",
-  );
-  for (const [key, message] of Object.entries(de)) {
-    assert.ok(message.length > 0, `de message "${key}" is empty — getMessage would return nothing`);
-    assert.ok(en[key].length > 0, `en message "${key}" is empty`);
-  }
-});
-
-test("every data-i18n key in popup.html exists in both locales", async () => {
+test("the extension ships only English UI messages", async () => {
   const h = await loadPopup();
-  const en = readLocale("en");
-  const de = readLocale("de");
-  const used = Object.keys(h.i18nText());
+  const en = readEnglishMessages();
 
+  const shippedLocales = readdirSync(LOCALES_DIR)
+    .filter((locale) => existsSync(join(LOCALES_DIR, locale, "messages.json")));
+  assert.deepEqual(shippedLocales, ["en"]);
+  assert.equal(MANIFEST.default_locale, "en");
+  assert.equal(MANIFEST.description, "__MSG_appDescription__");
+  assert.ok(en.appDescription.startsWith("Hide the LinkedIn feed"));
+  const used = Object.keys(h.i18nText());
   assert.ok(used.length > 0, "popup.html declares no data-i18n at all");
   for (const key of used) {
-    assert.ok(key in en, `popup.html uses "${key}" but _locales/en has no such message`);
-    assert.ok(key in de, `popup.html uses "${key}" but _locales/de has no such message`);
+    assert.ok(en[key]?.length > 0, `popup.html uses "${key}" without an English message`);
   }
   h.close();
 });
@@ -406,7 +392,7 @@ test("every data-i18n placeholder is actually replaced", async () => {
   // Sentinel messages: distinct from anything in the markup, so any element
   // still showing its shipped text was never resolved.
   const sentinels = Object.fromEntries(
-    Object.keys(readLocale("en")).map((key) => [key, `__resolved:${key}__`]),
+    Object.keys(readEnglishMessages()).map((key) => [key, `__resolved:${key}__`]),
   );
   const h = await loadPopup({ messages: sentinels, uiLocale: "xx_XX" });
 
@@ -423,65 +409,28 @@ test("every data-i18n placeholder is actually replaced", async () => {
   h.close();
 });
 
-test("the German locale replaces every visible string", async () => {
-  const h = await loadPopup({ locale: "de" });
-  const de = readLocale("de");
+test("a German browser locale still shows and announces the popup in English", async () => {
+  const h = await loadPopup({ uiLocale: "de_DE" });
 
-  assert.deepEqual(
-    h.i18nText(),
-    {
-      appName: de.appName,
-      popupHint: de.popupHint,
-      toggleFeed: de.toggleFeed,
-      toggleAds: de.toggleAds,
-      toggleNews: de.toggleNews,
-      toggleBadges: de.toggleBadges,
-    },
-    "the shipped German wording must reach the DOM",
-  );
-  assert.equal(h.labelFor("hideAds"), "Werbung");
-  assert.equal(h.document.documentElement.lang, "de-DE", "lang must follow the UI locale");
-  h.close();
-});
-
-test("lang is rewritten from @@ui_locale in BCP 47 form", async () => {
-  // Chromium and Firefox report a regional locale with an underscore ("en_US").
-  const h = await loadPopup({ locale: "en" });
-  assert.equal(
-    h.document.documentElement.lang,
-    "en-US",
-    "@@ui_locale uses underscores; the lang attribute needs a hyphen",
-  );
-  h.close();
-});
-
-test("a bare @@ui_locale is passed through unchanged", async () => {
-  // Safari returns the matched _locales directory name verbatim, so this
-  // extension sees "de", not "de_DE". The underscore rewrite must be a no-op
-  // there rather than mangling a already-valid tag.
-  const h = await loadPopup({ locale: "de", uiLocale: "de" });
-  assert.equal(h.document.documentElement.lang, "de");
-  h.close();
-});
-
-test("an empty @@ui_locale leaves the markup lang alone", async () => {
-  // Without a _locales match every predefined message is "". Writing that into
-  // lang= would strip the document's language entirely.
-  const h = await loadPopup({ locale: "en", uiLocale: "" });
-  assert.equal(h.document.documentElement.lang, "en", "lang must not be blanked");
+  assert.equal(h.document.documentElement.lang, "en");
+  assert.equal(h.document.title, "LinkedIn Focus");
+  assert.equal(h.labelFor("hideAds"), "Ads");
+  assert.equal(h.labelFor("hideNews"), "News & Games");
+  assert.equal(h.labelFor("hideBadges"), "Notification badges");
+  assert.ok(!h.i18nCalls.includes("@@ui_locale"));
   h.close();
 });
 
 test("a missing message keeps the English fallback and a usable toggle", async () => {
   // A translator drops a key, or a locale file is one release behind. The label
   // must not be blanked: an empty <label> is an unclickable checkbox.
-  const partial = readLocale("de");
+  const partial = readEnglishMessages();
   delete partial.toggleAds;
   const h = await loadPopup({ storage: {}, messages: partial, uiLocale: "de_DE" });
 
   assert.equal(h.labelFor("hideAds"), "Ads", "missing message must fall back to the markup text");
   assert.equal(h.labelFor("hideFeed"), "Feed / Timeline", "present messages must still apply");
-  assert.equal(h.labelFor("hideNews"), "News & Spiele");
+  assert.equal(h.labelFor("hideNews"), "News & Games");
 
   // The toggle still works end to end.
   assert.deepEqual(h.checkedState(), {
@@ -515,7 +464,7 @@ test("popup.html ships the English reference wording as its fallback", async () 
   // The inline text is what a user sees when i18n is unavailable, so it has to
   // BE the en locale rather than merely resemble it.
   const h = await loadPopup({ noI18n: true });
-  const en = readLocale("en");
+  const en = readEnglishMessages();
   for (const [key, text] of Object.entries(h.i18nText())) {
     assert.equal(text, en[key], `markup fallback for "${key}" drifted from _locales/en`);
   }

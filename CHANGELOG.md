@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-21
+
+### Changed
+
+- Use English for the popup and Safari's extension description on all systems.
+  Promoted posts are still detected on English and German LinkedIn pages.
+- Add a tested temporary Safari download, an installation guide, and an ad filter FAQ.
+
 ## [1.0.1] - 2026-11-21
 
 ### Added
@@ -86,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writable by the page: LinkedIn could have pinned it so the scan was skipped and
   an ad stayed visible, or frozen a "promoted" flag onto an organic post.
 
-[Unreleased]: https://github.com/jjarndt/linkedin-focus/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/jjarndt/linkedin-focus/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/jjarndt/linkedin-focus/releases/tag/v1.0.2
 [1.0.1]: https://github.com/jjarndt/linkedin-focus/releases/tag/v1.0.1
 [1.0.0]: https://github.com/jjarndt/linkedin-focus/releases/tag/v1.0.0

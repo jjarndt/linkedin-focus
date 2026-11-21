@@ -13,7 +13,7 @@ default.
 
 ![Illustrated demo of LinkedIn Focus hiding ads, news and games, notification badges, and the feed while keeping navigation visible](docs/linkedin-focus-demo.gif)
 
-[Quickstart](#quickstart) · Build locally on macOS with Safari and Xcode.
+[Try in Safari](#try-in-safari) · [Safari guide](https://jjarndt.github.io/linkedin-focus/) · [Build with Xcode](#quickstart)
 
 ## Features
 
@@ -28,6 +28,13 @@ and persisted in `storage.local`:
   right sidebar.
 - **Notification badges** — the red counters in the top navigation. The nav
   itself stays fully clickable.
+
+## FAQ
+
+### Can I block LinkedIn ads without hiding the feed?
+
+Yes. Turn on **Ads** and turn off **Feed / Timeline** in the Safari toolbar
+popup. This hides promoted posts and sidebar ads while keeping the feed visible.
 
 ## Scope
 
@@ -70,6 +77,20 @@ discussion.
 
 If one of these boundaries is in the way of a concrete use case, a fork is the
 right way forward. The license explicitly allows it.
+
+## Try in Safari
+
+You can try LinkedIn Focus on macOS without Xcode.
+
+1. [Download the Safari ZIP](https://github.com/jjarndt/linkedin-focus/releases/download/v1.0.2/linkedin-focus-safari.zip).
+2. In **Safari → Settings → Advanced**, enable **Show features for web developers**.
+3. In the **Developer** tab, click **Add Temporary Extension**, confirm the
+   unsigned extension prompt if Safari shows it, and select the ZIP.
+4. Open LinkedIn, click **LinkedIn Focus** in the Safari toolbar, and allow it
+   to run on the site.
+
+Safari removes a temporary extension after 24 hours or when you quit Safari.
+For a local build that persists across restarts, follow the [Xcode quickstart](#quickstart).
 
 ## Quickstart
 
@@ -131,7 +152,7 @@ and why.
 ```
 extension/            # the extension source (a plain WebExtension)
   manifest.json
-  _locales/en | de    # UI strings; en is the default locale
+  _locales/en         # English UI strings
   shared.js           # feature table (defaults), loaded by content script + popup
   content.js
   styles.css
