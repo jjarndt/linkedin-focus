@@ -13,6 +13,8 @@ controlled by four independent toggles in the popup, and the default is
 
 ![Illustrated demo of LinkedIn Focus hiding ads, news and games, notification badges, and the feed while keeping navigation visible](docs/linkedin-focus-demo.gif)
 
+[Quickstart](#quickstart) · Build locally on macOS with Safari and Xcode.
+
 ## Features
 
 Four independent toggles, each applied instantly across all open tabs (no reload)
