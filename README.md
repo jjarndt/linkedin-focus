@@ -13,7 +13,13 @@ default.
 
 ![Illustrated demo of LinkedIn Focus hiding ads, news and games, notification badges, and the feed while keeping navigation visible](docs/linkedin-focus-demo.gif)
 
-[Try in Safari](#try-in-safari) · [Safari guide](https://jjarndt.github.io/linkedin-focus/) · [Build with Xcode](#quickstart)
+<p>
+  <a href="#try-in-safari" title="Try in Safari"><img src="docs/icons/safari.png" width="40" height="40" alt="Try in Safari"></a>
+  &nbsp;
+  <a href="https://jjarndt.github.io/linkedin-focus/" title="Safari guide"><img src="docs/icons/guide.png" width="40" height="40" alt="Safari guide"></a>
+  &nbsp;
+  <a href="#quickstart" title="Build with Xcode"><img src="docs/icons/xcode.png" width="40" height="40" alt="Build with Xcode"></a>
+</p>
 
 ## Features
 
