@@ -1,10 +1,10 @@
 # LinkedIn Focus
 
-A Safari Web Extension (macOS) that hides distracting LinkedIn elements — the
-feed, promoted posts, the news/games rail, and notification badges — so you can
-use messaging and profiles without the pull of the timeline. Everything is
-controlled by four independent toggles in the popup, and the default is
-"everything hidden" (focus mode).
+LinkedIn Focus is a LinkedIn feed blocker for Safari on macOS. It hides the
+feed, promoted posts, the news and games rail, and notification badges so you
+can use messaging and profiles without the pull of the timeline. Four
+independent popup toggles let you choose what to hide. All four are on by
+default.
 
 [![CI](https://github.com/jjarndt/linkedin-focus/actions/workflows/ci.yml/badge.svg)](https://github.com/jjarndt/linkedin-focus/actions/workflows/ci.yml)
 
