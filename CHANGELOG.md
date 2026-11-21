@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-21
+
 ### Added
 
 - Localization via `extension/_locales/`. English is the default locale, German
@@ -15,16 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   being hardcoded German. The English wording stays inline in `popup.html` as a
   fallback, so a missing message degrades to English rather than to a blank
   label.
-
-### Changed
-
-### Deprecated
-
-### Removed
+- An illustrated demo and a Quickstart link in the README.
 
 ### Fixed
 
-### Security
+- Safari popup switches now respond across the full switch area.
+- Popup settings stay in sync with open LinkedIn tabs. Failed writes restore
+  the previous checkbox state.
+- Ads and news that load after the page are detected. Unrelated sidebar
+  widgets stay visible, including when they replace a hidden news card.
+- `sync.sh` now reports resources that the Safari extension target would omit
+  from the Xcode build.
 
 ## [1.0.0] - 2026-07-20
 
@@ -83,5 +86,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writable by the page: LinkedIn could have pinned it so the scan was skipped and
   an ad stayed visible, or frozen a "promoted" flag onto an organic post.
 
-[Unreleased]: https://github.com/jjarndt/linkedin-focus/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/jjarndt/linkedin-focus/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/jjarndt/linkedin-focus/releases/tag/v1.0.1
 [1.0.0]: https://github.com/jjarndt/linkedin-focus/releases/tag/v1.0.0
