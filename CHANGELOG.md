@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-22
+
+### Added
+
+- Allow the current LinkedIn profile or company from the Safari popup, or allow
+  an author directly from a post in the full feed.
+
+### Fixed
+
+- Keep simultaneous allow-list edits from separate tabs from overwriting each
+  other.
+
+## [1.1.0] - 2026-11-22
+
+### Added
+
+- Keep posts from selected people and companies visible while the feed is hidden.
+  The Safari popup saves profile and company URLs locally.
+
 ## [1.0.2] - 2026-11-21
 
 ### Changed
@@ -94,7 +113,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writable by the page: LinkedIn could have pinned it so the scan was skipped and
   an ad stayed visible, or frozen a "promoted" flag onto an organic post.
 
-[Unreleased]: https://github.com/jjarndt/linkedin-focus/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/jjarndt/linkedin-focus/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/jjarndt/linkedin-focus/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/jjarndt/linkedin-focus/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/jjarndt/linkedin-focus/releases/tag/v1.0.2
 [1.0.1]: https://github.com/jjarndt/linkedin-focus/releases/tag/v1.0.1
 [1.0.0]: https://github.com/jjarndt/linkedin-focus/releases/tag/v1.0.0

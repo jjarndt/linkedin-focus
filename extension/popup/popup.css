@@ -103,6 +103,8 @@ h1 { margin: 0; font-size: 16px; font-weight: 600; }
 }
 .accounts input { flex: 1; min-width: 0; }
 .accounts button { cursor: pointer; }
+#allowPageAccount { margin-top: 8px; }
+.accounts button:disabled { cursor: default; }
 .account-list { list-style: none; margin: 0; padding: 0; max-height: 132px; overflow: auto; }
 .account-list li {
   display: flex;

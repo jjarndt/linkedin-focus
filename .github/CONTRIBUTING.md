@@ -70,7 +70,7 @@ Two questions decide whether a change is accepted:
 
 1. Is it inside the scope described in the README? The extension hides feed,
    ads, the news and games rail, and notification badges, on LinkedIn, in
-   Safari on macOS, with four toggles and no options beyond them.
+   Safari on macOS, with four toggles and an allow-list for feed authors.
 2. Is the ongoing maintenance cost proportionate to the benefit?
 
 In maintenance mode the second question dominates. A merged pull request

@@ -20,6 +20,28 @@ html.lf-hide-feed.lf-filter-feed .scaffold-layout__main
   display: none !important;
 }
 
+/* Placed next to the author, outside LinkedIn's links and buttons. */
+.lf-post-account {
+  display: block;
+  margin: 4px 12px 8px auto;
+  padding: 4px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: #075aa6;
+  font: 600 12px/1.4 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  .lf-post-account { color: #a8d4ff; }
+}
+
+.lf-post-account:disabled { cursor: default; opacity: .7; }
+.lf-post-account:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+html.lf-hide-feed .lf-post-account,
+html:not(.lf-feed-page) .lf-post-account { display: none !important; }
+
 /* --- Ads: JS-flagged promoted posts + sidebar advertisements --- */
 /* New shell: the right-rail ad is the only iframe inside an aside. */
 html.lf-hide-ads .lf-ad,
