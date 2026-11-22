@@ -33,6 +33,7 @@ function log(...args) {
 }
 
 let currentState = { ...DEFAULTS };
+let allowedAccounts = new Set();
 
 // Classic shell reuses .scaffold-layout__main on profile/messaging pages, so the
 // feed rule there must be scoped to the feed route. The new shell needs no
@@ -49,6 +50,7 @@ function applyState() {
     root.classList.toggle(cls, currentState[key]);
   }
   root.classList.toggle("lf-feed-page", isFeedPage());
+  filterFeed();
 }
 
 // ---- Promoted-post detection ----------------------------------------------
@@ -58,6 +60,7 @@ function applyState() {
 // header, matched by word boundary.
 const LABELS = new Set(["Anzeige", "Promoted", "Gesponsert", "Sponsored"]);
 const PROMOTED_RE = /\b(promoted|gesponsert|sponsored|anzeige)\b/i;
+const NEW_FEED_ITEMS = '[data-testid="mainFeed"] > *';
 
 const CLASSIC_POST_SELECTOR = [
   '[data-id^="urn:li:activity:"]',
@@ -103,7 +106,7 @@ function markAdsNewShell() {
   // [data-lazy-mount-id] so the marker survives if that internal attribute
   // is renamed; non-post children simply never grow text and are skipped.
   document
-    .querySelectorAll('[data-testid="mainFeed"] > *')
+    .querySelectorAll(NEW_FEED_ITEMS)
     .forEach((post) => {
       const id = post.getAttribute("data-lazy-mount-id") || "1";
       if (checked.get(post) === id) return;
@@ -122,6 +125,52 @@ function markAdsNewShell() {
       post.classList.toggle("lf-ad", Boolean(label));
       if (label) log("ad (new shell):", label);
     });
+}
+
+// Match the outer post's actor header. Links in the post text, comments or
+// quoted content are not evidence of authorship.
+const REACT_POST_CARD = '[role="listitem"][componentkey^="update-card-focus"]';
+const REACT_ACTOR_AVATAR = 'a[href][aria-haspopup="dialog"]:has(figure)';
+const NEW_ACTOR_LINK = 'a[data-view-name="feed-actor-name"][href]';
+const CLASSIC_ACTOR_LINK = 'a.update-components-actor__meta-link[href], a.feed-shared-actor__container-link[href]';
+const CLASSIC_FEED_ITEMS = `.scaffold-layout__main :is(${CLASSIC_POST_SELECTOR})`;
+const QUOTED_POST = "blockquote, .update-components-mini-update-v2, .feed-shared-update-v2__reshared-content";
+const postAccounts = new WeakMap();
+
+function findReactActor(post) {
+  const card = post.querySelector(REACT_POST_CARD);
+  if (!card) return findActorLink(post, NEW_ACTOR_LINK);
+
+  // A social activity banner can precede the author, separated by a rule.
+  // Inspect the author header only, before the post body and comments.
+  let header = card.querySelector("h2")?.nextElementSibling;
+  const separator = header?.nextElementSibling;
+  if (separator?.matches('hr[role="presentation"]')) header = separator.nextElementSibling;
+  return header?.querySelector(REACT_ACTOR_AVATAR);
+}
+
+function findActorLink(post, selector) {
+  return [...post.querySelectorAll(selector)].find((link) => !link.closest(QUOTED_POST));
+}
+
+function markAllowedPost(post, findActor) {
+  if (!postAccounts.has(post)) {
+    postAccounts.set(post, accountPath(findActor(post)?.getAttribute("href")));
+  }
+  post.classList.toggle("lf-allowed-post", allowedAccounts.has(postAccounts.get(post)));
+}
+
+function filterFeed() {
+  const filtering = currentState.hideFeed && allowedAccounts.size > 0 && isFeedPage();
+  if (filtering) {
+    for (const post of document.querySelectorAll(NEW_FEED_ITEMS)) {
+      markAllowedPost(post, findReactActor);
+    }
+    for (const post of document.querySelectorAll(CLASSIC_FEED_ITEMS)) {
+      markAllowedPost(post, (item) => findActorLink(item, CLASSIC_ACTOR_LINK));
+    }
+  }
+  document.documentElement.classList.toggle("lf-filter-feed", filtering);
 }
 
 // ---- News-module detection (new shell) ------------------------------------
@@ -220,11 +269,11 @@ function scheduleScan() {
   scheduled = true;
   requestAnimationFrame(() => {
     scheduled = false;
-    applyState(); // path may have changed via SPA nav
     if (currentState.hideAds) {
       markAdsClassic();
       markAdsNewShell();
     }
+    applyState(); // path may have changed via SPA nav
     if (currentState.hideNews) markNews();
   });
 }
@@ -235,12 +284,16 @@ async function refreshState() {
   const liveKeys = new Set();
   pendingReadKeys = liveKeys;
   try {
-    const stored = await api.storage.local.get(DEFAULTS);
+    const stored = await api.storage.local.get(SETTINGS_DEFAULTS);
     if (pendingReadKeys !== liveKeys) return;
 
     for (const key of Object.keys(CLASS_MAP)) {
       if (!liveKeys.has(key)) currentState[key] = coerce(key, stored[key]);
     }
+    if (!liveKeys.has("allowedAccounts")) {
+      allowedAccounts = new Set(normalizeAllowedAccounts(stored.allowedAccounts));
+    }
+    applyState();
     scheduleScan();
   } catch (e) {
     log("storage read failed", e);
@@ -261,6 +314,11 @@ api.storage.onChanged.addListener((changes, areaName) => {
       touched = true;
     }
   }
+  if (changes.allowedAccounts) {
+    allowedAccounts = new Set(normalizeAllowedAccounts(changes.allowedAccounts.newValue));
+    pendingReadKeys?.add("allowedAccounts");
+    touched = true;
+  }
   if (touched) {
     applyState(); // immediately, no one-frame FOUC on toggle
     scheduleScan(); // markers may need to (re)run, e.g. hideAds just turned on
@@ -280,7 +338,10 @@ applyState();
 const observer = new MutationObserver((mutations) => {
   for (const { target } of mutations) {
     let element = target.nodeType === Node.ELEMENT_NODE ? target : target.parentElement;
-    for (; element; element = element.parentElement) checked.delete(element);
+    for (; element; element = element.parentElement) {
+      checked.delete(element);
+      postAccounts.delete(element);
+    }
   }
   scheduleScan();
 });
@@ -288,7 +349,7 @@ observer.observe(document.documentElement, {
   childList: true,
   characterData: true,
   attributes: true,
-  attributeFilter: ["data-testid", "data-id", "data-urn", "data-lazy-mount-id", "componentkey"],
+  attributeFilter: ["data-testid", "data-id", "data-urn", "data-lazy-mount-id", "componentkey", "data-view-name", "href", "role", "aria-haspopup"],
   subtree: true,
 });
 

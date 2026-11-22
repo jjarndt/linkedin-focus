@@ -94,7 +94,8 @@ function makeStorageApi(initial, { failGet = null } = {}) {
             return out;
           },
           set(obj) {
-            setCalls.push({ ...obj });
+            const changes = structuredClone(obj);
+            setCalls.push(changes);
             if (nextWriteError) {
               const result = Promise.reject(nextWriteError);
               nextWriteError = undefined;
@@ -102,7 +103,7 @@ function makeStorageApi(initial, { failGet = null } = {}) {
               result.catch(() => {});
               return result;
             }
-            Object.assign(data, obj);
+            Object.assign(data, changes);
             return Promise.resolve();
           },
         },
@@ -469,4 +470,83 @@ test("popup.html ships the English reference wording as its fallback", async () 
     assert.equal(text, en[key], `markup fallback for "${key}" drifted from _locales/en`);
   }
   h.close();
+});
+
+async function addAccount(h, url) {
+  h.document.getElementById("accountUrl").value = url;
+  h.document.querySelector("#allowedAccountsForm button[type=submit]").click();
+  await h.flush();
+}
+
+function listedAccounts(h) {
+  return [...h.document.querySelectorAll("#allowedAccountsList li span")].map((label) => label.textContent);
+}
+
+test("allowed accounts persist across reopened popups and can be removed individually", async (t) => {
+  const initial = await loadPopup({ storage: { hideAds: false } });
+  t.after(initial.close);
+  await addAccount(initial, "https://www.linkedin.com/in/Jane-Doe/?trk=feed");
+  await addAccount(initial, "https://www.linkedin.com/company/example-inc/");
+
+  assert.deepEqual(listedAccounts(initial), ["/in/jane-doe", "/company/example-inc"]);
+  assert.equal(initial.document.getElementById("accountUrl").value, "");
+  assert.deepEqual(initial.storageData, { hideAds: false, allowedAccounts: ["/in/jane-doe", "/company/example-inc"] });
+  assert.equal(initial.sentMessages.at(-1).message, "refreshSettings");
+
+  const reopened = await loadPopup({ storage: initial.storageData });
+  t.after(reopened.close);
+  assert.deepEqual(listedAccounts(reopened), ["/in/jane-doe", "/company/example-inc"]);
+
+  reopened.document.querySelector('[aria-label="Remove /in/jane-doe"]').click();
+  await reopened.flush();
+  assert.deepEqual(listedAccounts(reopened), ["/company/example-inc"]);
+  assert.deepEqual(reopened.setCalls, [{ allowedAccounts: ["/company/example-inc"] }]);
+});
+
+test("the allowed account form rejects invalid and duplicate URLs without writing", async (t) => {
+  const h = await loadPopup({ storage: { allowedAccounts: ["/in/jane"] } });
+  t.after(h.close);
+  const status = h.document.getElementById("accountStatus");
+  await addAccount(h, "https://not-linkedin.test/in/jane");
+  assert.equal(status.textContent, "Enter a LinkedIn profile or company URL.");
+  await addAccount(h, "https://uk.linkedin.com/in/Jane/?trk=feed");
+  assert.equal(status.textContent, "This account is already allowed.");
+  assert.deepEqual(h.setCalls, []);
+  assert.deepEqual(listedAccounts(h), ["/in/jane"]);
+});
+
+test("allowed account controls stay disabled until storage has loaded", async (t) => {
+  const h = await loadPopup({ autoResolveGet: false });
+  t.after(h.close);
+  const controls = h.document.getElementById("allowedAccountsControls");
+  assert.equal(controls.disabled, true);
+  await addAccount(h, "/in/jane");
+  assert.deepEqual(h.setCalls, []);
+
+  h.resolveInitialGet();
+  await h.flush();
+  assert.equal(controls.disabled, false);
+  assert.deepEqual(listedAccounts(h), []);
+});
+
+test("failed allow-list writes preserve stored accounts and leave the entry available for retry", async (t) => {
+  const h = await loadPopup({ storage: { allowedAccounts: ["/in/jane"] } });
+  t.after(h.close);
+  const status = h.document.getElementById("accountStatus");
+  h.failNextWrite(new Error("storage unavailable"));
+  await addAccount(h, "/company/example-inc");
+
+  assert.match(status.textContent, /Could not save/);
+  assert.equal(h.document.getElementById("accountUrl").value, "/company/example-inc");
+  assert.deepEqual(listedAccounts(h), ["/in/jane"]);
+  assert.equal(h.sentMessages.length, 0);
+
+  h.failNextWrite(new Error("storage unavailable"));
+  h.document.querySelector('[aria-label="Remove /in/jane"]').click();
+  await h.flush();
+  assert.deepEqual(h.storageData.allowedAccounts, ["/in/jane"]);
+  assert.deepEqual(listedAccounts(h), ["/in/jane"]);
+
+  await addAccount(h, "/company/example-inc");
+  assert.deepEqual(listedAccounts(h), ["/in/jane", "/company/example-inc"]);
 });

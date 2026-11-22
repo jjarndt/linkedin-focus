@@ -3,8 +3,8 @@
 LinkedIn Focus is a LinkedIn feed blocker for Safari on macOS. It hides the
 feed, promoted posts, the news and games rail, and notification badges so you
 can use messaging and profiles without the pull of the timeline. Four
-independent popup toggles let you choose what to hide. All four are on by
-default.
+independent popup toggles are on by default. Add people or companies to
+**Allowed accounts** to keep their posts visible in the hidden feed.
 
 [![CI](https://github.com/jjarndt/linkedin-focus/actions/workflows/ci.yml/badge.svg)](https://github.com/jjarndt/linkedin-focus/actions/workflows/ci.yml)
 
@@ -26,8 +26,8 @@ default.
 Four independent toggles, each applied instantly across all open tabs (no reload)
 and persisted in `storage.local`:
 
-- **Feed / Timeline** — hides the center column on the feed route, the composer
-  included. Profiles and messaging stay untouched.
+- **Feed / Timeline** — hides the feed. With **Allowed accounts**, it shows
+  posts from those authors. Profiles and messaging stay available.
 - **Ads** — promoted posts (detected in JavaScript by their label text, German
   and English) plus sidebar advertisements.
 - **News & Games** — the "LinkedIn News" module and the daily-games box in the
@@ -37,6 +37,16 @@ and persisted in `storage.local`:
 
 ## FAQ
 
+### How do I keep posts from specific accounts visible?
+
+Open the popup and turn on **Feed / Timeline**. Under **Allowed accounts**,
+paste a LinkedIn profile or company URL and click **Add**. Click **Remove**
+next to an account to hide its posts again. The extension saves the list
+locally in Safari and applies changes without a reload.
+
+The allow-list filters posts LinkedIn loads into your home feed. The **Ads**
+toggle still controls promoted posts, including those from allowed accounts.
+
 ### Can I block LinkedIn ads without hiding the feed?
 
 Yes. Turn on **Ads** and turn off **Feed / Timeline** in the Safari toolbar
@@ -44,10 +54,8 @@ popup. This hides promoted posts and sidebar ads while keeping the feed visible.
 
 ## Scope
 
-LinkedIn Focus does exactly one thing: it hides four groups of LinkedIn UI
-elements in Safari on macOS, switched by four toggles.
-
-Anything that serves that sentence is welcome. Everything else is listed below.
+LinkedIn Focus hides distractions on LinkedIn in Safari on macOS. The feed
+filter supports exceptions for selected people and companies.
 
 ## Non-Goals
 
@@ -62,20 +70,13 @@ discussion.
   WebExtension APIs (`globalThis.browser ?? globalThis.chrome`) and may well
   load elsewhere, but nothing here is built, signed, or verified against another
   browser.
-- **No user-configurable selectors.** Every selector is a constant in
-  `extension/content.js` and `extension/styles.css`. `storage.local` holds
-  exactly the four booleans declared in `extension/shared.js` and nothing else;
-  taking selectors from storage would mean executing user-supplied queries and
-  CSS against LinkedIn pages. Beyond that, every option doubles the number of
-  states that have to be tested and documented.
+- **No user-configurable selectors.** The extension defines its selectors
+  in `extension/content.js` and `extension/styles.css`. `storage.local` holds
+  the four toggle values and the list of allowed account paths.
 - **No network access and no telemetry.** The manifest requests the single
   permission `storage`, declares no `host_permissions` and no background script,
   and the code contains no `fetch`, `XMLHttpRequest`, or `sendBeacon`. Nothing
   leaves the browser, so there is nothing to opt out of.
-- **No features beyond the four toggles.** The feature table in `shared.js` and
-  the class map in `content.js` have exactly four entries, and each one maps to
-  a single class on `<html>`. Keyword muting, per-author filters, usage timers,
-  or schedules would need state and UI that this design does not have.
 - **No App Store distribution.** Signing is local free provisioning with a
   Personal Team, as described under [Signing & running](#signing--running).
   Store distribution needs a paid membership and a review process; building it
@@ -88,7 +89,7 @@ right way forward. The license explicitly allows it.
 
 You can try LinkedIn Focus on macOS without Xcode.
 
-1. [Download the Safari ZIP](https://github.com/jjarndt/linkedin-focus/releases/download/v1.0.2/linkedin-focus-safari.zip).
+1. [Download the Safari ZIP](https://github.com/jjarndt/linkedin-focus/releases/latest/download/linkedin-focus-safari.zip).
 2. In **Safari → Settings → Advanced**, enable **Show features for web developers**.
 3. In the **Developer** tab, click **Add Temporary Extension**, confirm the
    unsigned extension prompt if Safari shows it, and select the ZIP.

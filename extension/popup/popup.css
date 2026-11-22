@@ -23,7 +23,7 @@
 
 body {
   margin: 0;
-  width: 260px;
+  width: 300px;
   padding: 16px;
   font: 14px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   background: var(--bg);
@@ -87,3 +87,30 @@ h1 { margin: 0; font-size: 16px; font-weight: 600; }
   outline: 2px solid var(--track-on);
   outline-offset: 2px;
 }
+
+.accounts { border-top: 1px solid var(--border); padding-top: 12px; }
+.accounts h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.accounts fieldset { border: 0; margin: 10px 0 0; padding: 0; min-width: 0; }
+.accounts label { display: block; margin-bottom: 4px; font-size: 12px; }
+.account-entry { display: flex; gap: 6px; }
+.accounts input, .accounts button {
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  padding: 4px 8px;
+}
+.accounts input { flex: 1; min-width: 0; }
+.accounts button { cursor: pointer; }
+.account-list { list-style: none; margin: 0; padding: 0; max-height: 132px; overflow: auto; }
+.account-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+#accountStatus:empty { margin: 0; }
