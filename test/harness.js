@@ -31,7 +31,7 @@ const CONTENT_SRC = readFileSync(join(EXTENSION, "content.js"), "utf8");
 // testing nothing.
 const EPILOGUE = `
 ;window.__lf = {
-  coerce, applyState, isFeedPage, scheduleScan,
+  coerce, accountPath, normalizeAllowedAccounts, applyState, isFeedPage, scheduleScan,
   markAdsClassic, markAdsNewShell, markNews,
   findMarkedModules, collapseToSharedCard, outermostSingleChildWrapper,
   CLASS_MAP, DEFAULTS, NEWS_MARKERS, FEED_PATHS,

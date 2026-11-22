@@ -4,12 +4,19 @@
 
 /* --- Feed / center panel (incl. composer) --- */
 /* New shell: mainFeed only exists on the feed route, no scoping needed. */
-html.lf-hide-feed [data-testid="mainFeed"] {
+html.lf-hide-feed:not(.lf-filter-feed) [data-testid="mainFeed"] {
   display: none !important;
 }
 /* Classic shell: .scaffold-layout__main is also the center column of
    profile/messaging pages, so scope to the feed route (lf-feed-page). */
-html.lf-hide-feed.lf-feed-page .scaffold-layout__main {
+html.lf-hide-feed.lf-feed-page:not(.lf-filter-feed) .scaffold-layout__main {
+  display: none !important;
+}
+
+/* The whole feed stays mounted so LinkedIn can load and update posts normally. */
+html.lf-hide-feed.lf-filter-feed [data-testid="mainFeed"] > :not(.lf-allowed-post),
+html.lf-hide-feed.lf-filter-feed .scaffold-layout__main
+  :is([data-id^="urn:li:activity:"], [data-urn^="urn:li:activity:"], div.feed-shared-update-v2):not(.lf-allowed-post):not(.lf-allowed-post *) {
   display: none !important;
 }
 

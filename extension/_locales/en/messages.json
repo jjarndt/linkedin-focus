@@ -1,6 +1,6 @@
 {
   "appDescription": {
-    "message": "Hide the LinkedIn feed, promoted posts, sidebar ads, news and games, and notification badges in Safari.",
+    "message": "Hide the LinkedIn feed, ads, news, games, and notification badges in Safari. Keep posts from selected accounts visible.",
     "description": "Extension description, shown in the manifest and in Safari's extension settings."
   },
   "appName": {
@@ -10,6 +10,18 @@
   "popupHint": {
     "message": "On = hidden (focus)",
     "description": "Explains the toggle direction: a toggle that is on hides the corresponding element."
+  },
+  "allowedAccountsHeading": {
+    "message": "Allowed accounts"
+  },
+  "allowedAccountsHint": {
+    "message": "See posts from these accounts while the feed is hidden."
+  },
+  "accountUrl": {
+    "message": "LinkedIn profile or company URL"
+  },
+  "addAccount": {
+    "message": "Add"
   },
   "toggleAds": {
     "message": "Ads",

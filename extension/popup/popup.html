@@ -47,6 +47,22 @@
     </li>
   </ul>
 
+  <section class="accounts" aria-labelledby="allowedAccountsHeading">
+    <h2 id="allowedAccountsHeading" data-i18n="allowedAccountsHeading">Allowed accounts</h2>
+    <p class="hint" id="allowedAccountsHint" data-i18n="allowedAccountsHint">See posts from these accounts while the feed is hidden.</p>
+    <form id="allowedAccountsForm">
+      <fieldset id="allowedAccountsControls" disabled>
+        <label for="accountUrl" data-i18n="accountUrl">LinkedIn profile or company URL</label>
+        <div class="account-entry">
+          <input type="text" id="accountUrl" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="allowedAccountsHint" required>
+          <button type="submit" data-i18n="addAccount">Add</button>
+        </div>
+        <ul id="allowedAccountsList" class="account-list"></ul>
+      </fieldset>
+    </form>
+    <p id="accountStatus" class="hint" role="status"></p>
+  </section>
+
   <script src="../shared.js"></script>
   <script src="popup.js"></script>
 </body>
