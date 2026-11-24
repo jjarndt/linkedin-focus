@@ -50,7 +50,7 @@ function applyState() {
     root.classList.toggle(cls, currentState[key]);
   }
   root.classList.toggle("lf-feed-page", isFeedPage());
-  filterFeed();
+  updateFeed();
 }
 
 // ---- Promoted-post detection ----------------------------------------------
@@ -136,38 +136,109 @@ const CLASSIC_ACTOR_LINK = 'a.update-components-actor__meta-link[href], a.feed-s
 const CLASSIC_FEED_ITEMS = `.scaffold-layout__main :is(${CLASSIC_POST_SELECTOR})`;
 const QUOTED_POST = "blockquote, .update-components-mini-update-v2, .feed-shared-update-v2__reshared-content";
 const postAccounts = new WeakMap();
+const postActions = new WeakMap();
 
 function findReactActor(post) {
   const card = post.querySelector(REACT_POST_CARD);
-  if (!card) return findActorLink(post, NEW_ACTOR_LINK);
+  if (!card) {
+    const link = findActorLink(post, NEW_ACTOR_LINK);
+    return { link, anchor: link };
+  }
 
   // A social activity banner can precede the author, separated by a rule.
   // Inspect the author header only, before the post body and comments.
   let header = card.querySelector("h2")?.nextElementSibling;
   const separator = header?.nextElementSibling;
   if (separator?.matches('hr[role="presentation"]')) header = separator.nextElementSibling;
-  return header?.querySelector(REACT_ACTOR_AVATAR);
+  return { link: header?.querySelector(REACT_ACTOR_AVATAR), anchor: header };
+}
+
+function findClassicActor(post) {
+  const link = findActorLink(post, CLASSIC_ACTOR_LINK);
+  return { link, anchor: link?.closest(".update-components-actor") ?? link };
 }
 
 function findActorLink(post, selector) {
   return [...post.querySelectorAll(selector)].find((link) => !link.closest(QUOTED_POST));
 }
 
-function markAllowedPost(post, findActor) {
-  if (!postAccounts.has(post)) {
-    postAccounts.set(post, accountPath(findActor(post)?.getAttribute("href")));
-  }
-  post.classList.toggle("lf-allowed-post", allowedAccounts.has(postAccounts.get(post)));
+function findPostAccount(post, findActor) {
+  const { link, anchor } = findActor(post);
+  const path = accountPath(link?.getAttribute("href"));
+  return path ? { path, anchor } : null;
 }
 
-function filterFeed() {
-  const filtering = currentState.hideFeed && allowedAccounts.size > 0 && isFeedPage();
-  if (filtering) {
+function renderPostAction(action) {
+  const allowed = allowedAccounts.has(action.path);
+  action.button.disabled = action.pending || allowed;
+  const label = allowed ? "Account allowed" : action.failed ? "Try again" : "Allow this account";
+  if (action.button.textContent !== label) {
+    action.button.textContent = label;
+    action.button.setAttribute("aria-label", `${label}: ${decodeURIComponent(action.path)}`);
+  }
+}
+
+async function allowPostAccount(event, action, post, findActor) {
+  // The page can dispatch clicks on injected buttons. Save only on a real user
+  // action and recheck the author in case LinkedIn has recycled the card.
+  if (!event.isTrusted || action.button.disabled || currentState.hideFeed || !isFeedPage()) return;
+  const account = findPostAccount(post, findActor);
+  if (account?.path !== action.path || account.anchor.nextElementSibling !== action.button) return;
+  event.stopPropagation();
+  action.pending = true;
+  action.failed = false;
+  renderPostAction(action);
+  try {
+    await changeAllowedAccount(api, action.path, true);
+    await refreshState();
+  } catch (e) {
+    action.failed = true;
+    log("allow account failed", e);
+  } finally {
+    action.pending = false;
+    renderPostAction(action);
+  }
+}
+
+function updatePostAction(post, account, findActor) {
+  let action = postActions.get(post);
+  if (action && (action.path !== account?.path || action.anchor !== account.anchor)) {
+    action.button.remove();
+    postActions.delete(post);
+    action = null;
+  }
+  if (!account) return;
+  if (!action) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "lf-post-account";
+    const newAction = { ...account, button, pending: false, failed: false };
+    button.addEventListener("click", (event) => allowPostAccount(event, newAction, post, findActor));
+    postActions.set(post, newAction);
+    action = newAction;
+  }
+  renderPostAction(action);
+  if (action.anchor.nextElementSibling !== action.button) action.anchor.after(action.button);
+}
+
+function updatePost(post, findActor, filtering) {
+  if (!postAccounts.has(post)) {
+    postAccounts.set(post, findPostAccount(post, findActor));
+  }
+  const account = postAccounts.get(post);
+  if (filtering) post.classList.toggle("lf-allowed-post", allowedAccounts.has(account?.path));
+  if (!currentState.hideFeed) updatePostAction(post, account, findActor);
+}
+
+function updateFeed() {
+  const feedPage = isFeedPage();
+  const filtering = feedPage && currentState.hideFeed && allowedAccounts.size > 0;
+  if (filtering || (feedPage && !currentState.hideFeed)) {
     for (const post of document.querySelectorAll(NEW_FEED_ITEMS)) {
-      markAllowedPost(post, findReactActor);
+      updatePost(post, findReactActor, filtering);
     }
     for (const post of document.querySelectorAll(CLASSIC_FEED_ITEMS)) {
-      markAllowedPost(post, (item) => findActorLink(item, CLASSIC_ACTOR_LINK));
+      if (!post.parentElement.closest(CLASSIC_FEED_ITEMS)) updatePost(post, findClassicActor, filtering);
     }
   }
   document.documentElement.classList.toggle("lf-filter-feed", filtering);
@@ -357,7 +428,10 @@ observer.observe(document.documentElement, {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") refreshState();
 });
-api.runtime.onMessage.addListener((message) => {
+api.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message === REFRESH_SETTINGS) refreshState();
+  if (message === GET_PAGE_ACCOUNT) {
+    sendResponse(accountPath(location.href, { allowSubpages: true }));
+  }
 });
 refreshState();

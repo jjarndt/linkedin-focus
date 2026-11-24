@@ -22,6 +22,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { JSDOM } from "jsdom";
+import { connectBackground } from "./harness.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const POPUP_DIR = join(ROOT, "extension", "popup");
@@ -64,7 +65,7 @@ function makeI18nApi(messages, uiLocale) {
  * are the only two members popup.js touches — anything else it started calling
  * would throw instead of being silently absorbed.
  */
-function makeStorageApi(initial, { failGet = null } = {}) {
+function makeStorageApi(initial, { failGet, pageAccount }) {
   const data = { ...initial };
   const setCalls = [];
   const sentMessages = [];
@@ -81,6 +82,10 @@ function makeStorageApi(initial, { failGet = null } = {}) {
           return options.active && options.currentWindow ? [{ id: 7 }] : [];
         },
         async sendMessage(tabId, message) {
+          if (message === "getPageAccount") {
+            if (pageAccount instanceof Error) throw pageAccount;
+            return pageAccount;
+          }
           sentMessages.push({ tabId, message, stored: { ...data } });
         },
       },
@@ -136,6 +141,7 @@ async function loadPopup(opts = {}) {
     messages = null,
     uiLocale = "en_US",
     noI18n = false,
+    pageAccount = null,
   } = opts;
 
   const dom = new JSDOM(POPUP_HTML, {
@@ -144,7 +150,8 @@ async function loadPopup(opts = {}) {
   });
   const { window } = dom;
 
-  const { api, releaseGet, setCalls, sentMessages, failNextWrite, raw } = makeStorageApi(storage, { failGet });
+  const { api, releaseGet, setCalls, sentMessages, failNextWrite, raw } = makeStorageApi(storage, { failGet, pageAccount });
+  api.runtime = { sendMessage: connectBackground(api.storage) };
   const { i18n, calls: i18nCalls } = makeI18nApi(messages ?? readEnglishMessages(), uiLocale);
   if (!noI18n) api.i18n = i18n;
   window.browser = api;
@@ -549,4 +556,65 @@ test("failed allow-list writes preserve stored accounts and leave the entry avai
 
   await addAccount(h, "/company/example-inc");
   assert.deepEqual(listedAccounts(h), ["/in/jane", "/company/example-inc"]);
+});
+
+test("the current profile or company can be allowed directly from the popup", async (t) => {
+  for (const path of ["/in/alex", "/company/example"]) {
+    const h = await loadPopup({ pageAccount: path, storage: { allowedAccounts: ["/in/existing"] } });
+    t.after(h.close);
+    const button = h.document.getElementById("allowPageAccount");
+
+    assert.equal(button.hidden, false);
+    assert.equal(button.disabled, false);
+    button.click();
+    await h.flush();
+
+    assert.deepEqual(h.storageData.allowedAccounts, ["/in/existing", path]);
+    assert.deepEqual(listedAccounts(h), ["/in/existing", path]);
+    assert.equal(button.textContent, "Account allowed");
+    assert.equal(button.disabled, true);
+
+    h.document.querySelector(`[aria-label="Remove ${path}"]`).click();
+    await h.flush();
+    assert.equal(button.textContent, "Allow this account");
+    assert.equal(button.disabled, false);
+  }
+});
+
+test("an already allowed page starts disabled and does not write a duplicate", async (t) => {
+  const h = await loadPopup({ pageAccount: "/in/alex", storage: { allowedAccounts: ["/in/alex"] } });
+  t.after(h.close);
+  const button = h.document.getElementById("allowPageAccount");
+
+  assert.equal(button.textContent, "Account allowed");
+  button.click();
+  await h.flush();
+  assert.deepEqual(h.setCalls, []);
+});
+
+test("the popup hides the shortcut on unsupported pages and when there is no receiver", async (t) => {
+  for (const pageAccount of [null, new Error("no content script"), "https://example.test/in/other"]) {
+    const h = await loadPopup({ pageAccount });
+    t.after(h.close);
+    assert.equal(h.document.getElementById("allowPageAccount").hidden, true);
+    assert.deepEqual(h.errors, []);
+  }
+});
+
+test("a failed page shortcut write can be retried with the same account", async (t) => {
+  const h = await loadPopup({ pageAccount: "/company/example" });
+  t.after(h.close);
+  const button = h.document.getElementById("allowPageAccount");
+  h.failNextWrite(new Error("storage unavailable"));
+  button.click();
+  await h.flush();
+
+  assert.match(h.document.getElementById("accountStatus").textContent, /Could not save/);
+  assert.equal(button.disabled, false);
+  assert.deepEqual(listedAccounts(h), []);
+
+  button.click();
+  await h.flush();
+  assert.deepEqual(listedAccounts(h), ["/company/example"]);
+  assert.equal(button.disabled, true);
 });

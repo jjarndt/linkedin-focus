@@ -1,8 +1,3 @@
-// LinkedIn Focus popup: reads/writes storage.local; content scripts react via
-// onChanged. DEFAULTS comes from shared.js (loaded first in popup.html).
-//
-// Checkboxes stay disabled until the stored state has loaded.
-
 const api = globalThis.browser ?? globalThis.chrome;
 
 // Load the bundled English wording. Every write requires a non-empty message:
@@ -19,13 +14,13 @@ function localize() {
   }
 }
 
-async function refreshActiveTab() {
+async function messageActiveTab(message) {
   const [tab] = await api.tabs.query({ active: true, currentWindow: true });
-  if (tab?.id != null) await api.tabs.sendMessage(tab.id, REFRESH_SETTINGS);
+  if (tab?.id != null) return api.tabs.sendMessage(tab.id, message);
 }
 
 function notifyActiveTab() {
-  refreshActiveTab().catch(() => {
+  messageActiveTab(REFRESH_SETTINGS).catch(() => {
     // There may be no receiver if the active tab is outside LinkedIn.
   });
 }
@@ -36,7 +31,17 @@ function initAllowedAccounts(stored) {
   const input = document.getElementById("accountUrl");
   const list = document.getElementById("allowedAccountsList");
   const status = document.getElementById("accountStatus");
+  const pageButton = document.getElementById("allowPageAccount");
   let accounts = normalizeAllowedAccounts(stored);
+  let pageAccount = null;
+
+  function renderPageButton() {
+    const allowed = accounts.includes(pageAccount);
+    pageButton.hidden = !pageAccount;
+    pageButton.disabled = controls.disabled || allowed;
+    pageButton.textContent = allowed ? "Account allowed" : "Allow this account";
+    if (pageAccount) pageButton.setAttribute("aria-label", `${pageButton.textContent}: ${decodeURIComponent(pageAccount)}`);
+  }
 
   function render() {
     list.replaceChildren(...accounts.map((path) => {
@@ -48,21 +53,21 @@ function initAllowedAccounts(stored) {
       remove.textContent = "Remove";
       remove.setAttribute("aria-label", `Remove ${label.textContent}`);
       remove.addEventListener("click", () => {
-        save(accounts.filter((entry) => entry !== path), "Account removed.", remove);
+        save(path, false, remove);
       });
       item.append(label, remove);
       return item;
     }));
   }
 
-  async function save(next, message, retryControl) {
+  async function save(path, allowed, retryControl) {
     if (controls.disabled) return;
     controls.disabled = true;
+    renderPageButton();
     try {
-      await api.storage.local.set({ allowedAccounts: next });
-      accounts = next;
+      accounts = await changeAllowedAccount(api, path, allowed);
       render();
-      status.textContent = message;
+      status.textContent = allowed ? "Account added." : "Account removed.";
       notifyActiveTab();
     } catch (e) {
       status.textContent = "Could not save your allowed accounts. Try again.";
@@ -70,7 +75,8 @@ function initAllowedAccounts(stored) {
       return false;
     } finally {
       controls.disabled = false;
-      (retryControl.isConnected ? retryControl : input).focus();
+      renderPageButton();
+      (retryControl.isConnected && !retryControl.disabled ? retryControl : input).focus();
     }
     return true;
   }
@@ -89,11 +95,20 @@ function initAllowedAccounts(stored) {
       input.focus();
       return;
     }
-    if (await save([...accounts, path], "Account added.", input)) input.value = "";
+    if (await save(path, true, input)) input.value = "";
+  });
+  pageButton.addEventListener("click", () => {
+    if (pageAccount) save(pageAccount, true, pageButton);
   });
   input.addEventListener("input", () => { status.textContent = ""; });
   render();
   controls.disabled = false;
+  messageActiveTab(GET_PAGE_ACCOUNT).then((path) => {
+    pageAccount = accountPath(path);
+    renderPageButton();
+  }).catch(() => {
+    // The active tab may be outside LinkedIn or awaiting site access.
+  });
 }
 
 async function init() {

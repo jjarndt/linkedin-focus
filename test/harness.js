@@ -18,6 +18,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { runInNewContext } from "node:vm";
 import { JSDOM } from "jsdom";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -25,6 +26,20 @@ const EXTENSION = join(ROOT, "extension");
 
 const SHARED_SRC = readFileSync(join(EXTENSION, "shared.js"), "utf8");
 const CONTENT_SRC = readFileSync(join(EXTENSION, "content.js"), "utf8");
+const BACKGROUND_SRC = readFileSync(join(EXTENSION, "background.js"), "utf8");
+
+export function connectBackground(storage) {
+  let receiver;
+  const browser = {
+    storage,
+    runtime: { onMessage: { addListener: (fn) => { receiver = fn; } } },
+  };
+  runInNewContext(SHARED_SRC + "\n" + BACKGROUND_SRC, { browser, URL });
+  return (message) => new Promise((resolve) => {
+    const pending = receiver(structuredClone(message), {}, (reply) => resolve(structuredClone(reply)));
+    if (pending !== true) resolve(undefined);
+  });
+}
 
 // Internals the tests reach for. Names are coupled to content.js on purpose —
 // if a function is renamed, the epilogue fails loudly instead of silently
@@ -35,6 +50,7 @@ const EPILOGUE = `
   markAdsClassic, markAdsNewShell, markNews,
   findMarkedModules, collapseToSharedCard, outermostSingleChildWrapper,
   CLASS_MAP, DEFAULTS, NEWS_MARKERS, FEED_PATHS,
+  allowPostAccount, findReactActor, postActions,
   get currentState() { return currentState; },
 };
 `;
@@ -113,7 +129,11 @@ function makeStorageApi(initial, { getRejects = false } = {}) {
     releaseGet,
     raw: data,
     emit,
-    emitMessage: (message) => messageListeners.forEach((listener) => listener(message)),
+    emitMessage(message) {
+      let reply;
+      for (const listener of messageListeners) listener(message, {}, (value) => { reply = value; });
+      return reply;
+    },
   };
 }
 
@@ -146,6 +166,7 @@ export async function loadExtension(opts = {}) {
   window.requestAnimationFrame = (fn) => rafQueue.push(fn);
 
   const { api, releaseGet, raw, emit, emitMessage } = makeStorageApi(storage, { getRejects });
+  api.runtime.sendMessage = connectBackground(api.storage);
   window.browser = api;
 
   const logs = [];

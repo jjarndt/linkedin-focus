@@ -39,10 +39,14 @@ and persisted in `storage.local`:
 
 ### How do I keep posts from specific accounts visible?
 
-Open the popup and turn on **Feed / Timeline**. Under **Allowed accounts**,
-paste a LinkedIn profile or company URL and click **Add**. Click **Remove**
-next to an account to hide its posts again. The extension saves the list
-locally in Safari and applies changes without a reload.
+On a LinkedIn profile or company page, open the Safari popup and click
+**Allow this account**. In the full feed, the same button appears next to
+the author of a post. You can also paste a profile or company URL into
+**Allowed accounts** and click **Add**.
+
+Turn on **Feed / Timeline** to show only posts from allowed accounts. Click
+**Remove** next to an account in the popup to take it off the list. Safari
+stores the list locally and applies changes without reloading LinkedIn.
 
 The allow-list filters posts LinkedIn loads into your home feed. The **Ads**
 toggle still controls promoted posts, including those from allowed accounts.
@@ -73,10 +77,9 @@ discussion.
 - **No user-configurable selectors.** The extension defines its selectors
   in `extension/content.js` and `extension/styles.css`. `storage.local` holds
   the four toggle values and the list of allowed account paths.
-- **No network access and no telemetry.** The manifest requests the single
-  permission `storage`, declares no `host_permissions` and no background script,
-  and the code contains no `fetch`, `XMLHttpRequest`, or `sendBeacon`. Nothing
-  leaves the browser, so there is nothing to opt out of.
+- **No network access and no telemetry.** The extension uses the `storage`
+  permission for settings and account paths. The extension code makes no
+  network requests.
 - **No App Store distribution.** Signing is local free provisioning with a
   Personal Team, as described under [Signing & running](#signing--running).
   Store distribution needs a paid membership and a review process; building it
@@ -126,9 +129,10 @@ targets, `Cmd-R`, then enable the extension in Safari's settings and allow it on
 
 ## How it works
 
-- **Manifest V3, no background script.** The popup writes to `storage.local`; the
-  content script listens on `storage.onChanged` and toggles `lf-*` classes on the
-  `<html>` element. `styles.css` does the actual hiding.
+- **Manifest V3.** The popup writes toggles to `storage.local`. A nonpersistent
+  background page serializes allow-list edits from the popup and feed. The
+  content script reacts to storage changes and applies the hiding rules from
+  `styles.css`.
 - **No feed flash.** The content script and stylesheet are injected at
   `document_start`, so hidden elements never paint.
 - **JS-flagged elements.** Where LinkedIn offers no stable CSS anchor, promoted
@@ -221,17 +225,19 @@ the generated Safari project's Resources directory:
 ./sync.sh
 ```
 
-Then reload the extension in Safari — no full Xcode rebuild is needed for
-resource-only changes.
+Then reload the extension in Safari. If you generated the Xcode project before
+v1.2.0, copy `extension/background.js` into the generated extension's
+`Resources` directory and add it to the extension target's **Copy Bundle
+Resources** before syncing. You can also generate a fresh project.
 
 ## Disclaimer
 
 This is an independent, unofficial project. It is **not** affiliated with,
 endorsed by, sponsored by, or connected to LinkedIn or Microsoft in any way.
-"LinkedIn" is a trademark of Microsoft Corporation. The extension only restyles
-pages locally in your own browser; it does not modify, access, or transmit any
-account data. Use it at your own discretion — LinkedIn's DOM can change at any
-time and break the selectors.
+"LinkedIn" is a trademark of Microsoft Corporation. The extension reads profile
+and company paths from supported pages and filters posts in your browser.
+Settings and the allow-list stay on your device. Changes to LinkedIn's page
+structure can affect detection.
 
 ## License
 
