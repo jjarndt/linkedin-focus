@@ -38,7 +38,7 @@ if [[ ! -f "$PROJECT" ]]; then
   exit 1
 fi
 
-# rsync cannot add new top-level resources to the converter's build phase.
+# Check the build phase before rsync can leave Xcode with missing resources.
 EXTENSION_TARGET="$(basename "$(dirname "$DEST")")"
 plutil -convert xml1 -o - "$PROJECT" | /usr/bin/python3 -c '
 import plistlib
@@ -55,22 +55,32 @@ if target is None:
     sys.exit(f"Error: Xcode target {target_name} not found.")
 
 bundled = set()
+resource_sources = set()
 for phase_id in target["buildPhases"]:
     phase = objects[phase_id]
     if phase["isa"] != "PBXResourcesBuildPhase":
         continue
     for file_id in phase["files"]:
         reference = objects[objects[file_id]["fileRef"]]
-        bundled.add(Path(reference["path"]).name)
+        path = Path(reference["path"])
+        bundled.add(path.name)
+        if path.parts[:1] == ("Resources",):
+            resource_sources.add(path.relative_to("Resources"))
 
+source = Path(source)
 missing = sorted(
-    path.name for path in Path(source).iterdir()
+    path.name for path in source.iterdir()
     if not path.name.startswith(".") and path.name not in bundled
 )
+stale = sorted(str(path) for path in resource_sources if not (source / path).exists())
 if missing:
     print("Error: the Xcode project does not bundle these extension resources:", file=sys.stderr)
     print("  " + "\n  ".join(missing), file=sys.stderr)
-    sys.exit("Add them to the Copy Bundle Resources phase of the extension target or regenerate the Xcode project before syncing.")
+if stale:
+    print("Error: the Xcode project still references removed resources:", file=sys.stderr)
+    print("  " + "\n  ".join(stale), file=sys.stderr)
+if missing or stale:
+    sys.exit("Update the Copy Bundle Resources phase of the extension target or regenerate the Xcode project before syncing.")
 ' "$SRC" "$EXTENSION_TARGET"
 
 rsync -av --delete "$SRC" "$DEST/"

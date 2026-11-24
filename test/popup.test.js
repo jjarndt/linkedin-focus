@@ -60,16 +60,15 @@ function makeI18nApi(messages, uiLocale) {
   };
 }
 
-/**
- * browser.storage.local double for the popup. Only get/set exist, because those
- * are the only two members popup.js touches — anything else it started calling
- * would throw instead of being silently absorbed.
- */
+/** Shared storage for the popup and the background account writer. */
 function makeStorageApi(initial, { failGet, pageAccount }) {
   const data = { ...initial };
   const setCalls = [];
   const sentMessages = [];
+  const storageListeners = [];
   let nextWriteError;
+  let nextWriteGate;
+  let initialRead = true;
   let releaseGet;
   const getGate = new Promise((resolve) => {
     releaseGet = resolve;
@@ -90,26 +89,41 @@ function makeStorageApi(initial, { failGet, pageAccount }) {
         },
       },
       storage: {
+        onChanged: {
+          addListener(listener) {
+            storageListeners.push(listener);
+          },
+        },
         local: {
           async get(defaults) {
-            await getGate;
-            if (failGet) throw failGet;
-            const out = { ...(defaults ?? {}) };
-            for (const key of Object.keys(data)) out[key] = data[key];
-            return out;
+            const snapshot = structuredClone({ ...defaults, ...data });
+            if (initialRead) {
+              initialRead = false;
+              await getGate;
+              if (failGet) throw failGet;
+            }
+            return snapshot;
           },
-          set(obj) {
+          async set(obj) {
             const changes = structuredClone(obj);
             setCalls.push(changes);
             if (nextWriteError) {
-              const result = Promise.reject(nextWriteError);
+              const error = nextWriteError;
               nextWriteError = undefined;
-              // Observe the mock rejection without consuming it for popup.js.
-              result.catch(() => {});
-              return result;
+              throw error;
             }
+            if (nextWriteGate) {
+              const gate = nextWriteGate;
+              nextWriteGate = undefined;
+              await gate;
+            }
+            const event = Object.fromEntries(Object.entries(changes).map(([key, newValue]) => [
+              key, { oldValue: data[key], newValue },
+            ]));
             Object.assign(data, changes);
-            return Promise.resolve();
+            queueMicrotask(() => {
+              for (const listener of storageListeners) listener(event, "local");
+            });
           },
         },
       },
@@ -118,6 +132,11 @@ function makeStorageApi(initial, { failGet, pageAccount }) {
     setCalls,
     sentMessages,
     failNextWrite: (error) => { nextWriteError = error; },
+    pauseNextWrite() {
+      let resume;
+      nextWriteGate = new Promise((resolve) => { resume = resolve; });
+      return resume;
+    },
     raw: data,
   };
 }
@@ -150,7 +169,7 @@ async function loadPopup(opts = {}) {
   });
   const { window } = dom;
 
-  const { api, releaseGet, setCalls, sentMessages, failNextWrite, raw } = makeStorageApi(storage, { failGet, pageAccount });
+  const { api, releaseGet, setCalls, sentMessages, failNextWrite, pauseNextWrite, raw } = makeStorageApi(storage, { failGet, pageAccount });
   api.runtime = { sendMessage: connectBackground(api.storage) };
   const { i18n, calls: i18nCalls } = makeI18nApi(messages ?? readEnglishMessages(), uiLocale);
   if (!noI18n) api.i18n = i18n;
@@ -181,7 +200,11 @@ async function loadPopup(opts = {}) {
     setCalls,
     sentMessages,
     failNextWrite,
+    pauseNextWrite,
     storageData: raw,
+    changeAccountFromFeed: (list, path) => api.runtime.sendMessage({
+      type: "changeAccountList", list, path, include: true,
+    }),
     errors,
     flush,
     i18nCalls,
@@ -489,6 +512,61 @@ async function addAccount(h, url, key = "allowedAccounts") {
 function listedAccounts(h, key = "allowedAccounts") {
   return [...h.document.querySelectorAll(`#${key}List li span`)].map((label) => label.textContent);
 }
+
+test("the open popup reflects account actions that finish in another tab", async (t) => {
+  const h = await loadPopup({ pageAccount: "/in/alex" });
+  t.after(h.close);
+  const block = h.document.getElementById("blockPageAccount");
+  assert.equal(block.disabled, false);
+
+  await h.changeAccountFromFeed("blockedAccounts", "/in/alex");
+  await h.flush();
+
+  assert.deepEqual(h.storageData.blockedAccounts, ["/in/alex"]);
+  assert.deepEqual(listedAccounts(h, "blockedAccounts"), ["/in/alex"]);
+  assert.equal(block.textContent, "Account blocked");
+  assert.equal(block.disabled, true);
+});
+
+test("an account action during popup startup takes precedence over the older snapshot", async (t) => {
+  const h = await loadPopup({
+    storage: { allowedAccounts: ["/in/first"] },
+    autoResolveGet: false,
+  });
+  t.after(h.close);
+
+  await h.changeAccountFromFeed("allowedAccounts", "/in/second");
+  await h.flush();
+  h.resolveInitialGet();
+  await h.flush();
+
+  assert.deepEqual(h.storageData.allowedAccounts, ["/in/first", "/in/second"]);
+  assert.deepEqual(listedAccounts(h), ["/in/first", "/in/second"]);
+});
+
+test("saving a list preserves focus when the user moves to the other list", async (t) => {
+  const h = await loadPopup();
+  t.after(h.close);
+
+  const resumeWrite = h.pauseNextWrite();
+  const add = h.document.querySelector("#allowedAccountsForm button[type=submit]");
+  const allowedInput = h.document.getElementById("accountUrl");
+  const blockedInput = h.document.getElementById("blockedAccountUrl");
+  allowedInput.value = "/in/alex";
+  add.focus();
+  add.click();
+  await h.flush();
+  assert.equal(h.document.getElementById("allowedAccountsControls").disabled, true);
+  assert.deepEqual(listedAccounts(h), []);
+
+  blockedInput.focus();
+  assert.equal(h.document.activeElement, blockedInput);
+  resumeWrite();
+  await h.flush();
+
+  assert.deepEqual(listedAccounts(h), ["/in/alex"]);
+  assert.equal(h.document.activeElement.id, "blockedAccountUrl");
+});
 
 test("allowed accounts persist across reopened popups and can be removed individually", async (t) => {
   const initial = await loadPopup({ storage: { hideAds: false } });

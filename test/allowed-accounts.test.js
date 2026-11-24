@@ -139,6 +139,21 @@ test("React update cards match the avatar in the primary author header", async (
   assert.equal(visible(h, "comment"), false);
 });
 
+test("React cards mounted directly in the feed use their primary author header", async (t) => {
+  const h = await openFeed(t, {
+    storage: { hideFeed: false, blockedAccounts: ["/in/jane"] },
+    body: newShellFeed([`
+      <div id="jane" role="listitem" componentkey="update-card-focus-jane">
+        <h2>Feed post</h2>
+        <div><a href="/in/jane" aria-haspopup="dialog"><figure></figure></a></div>
+        <p>Post body</p>
+      </div>
+    `]),
+  });
+
+  assert.equal(visible(h, "jane"), false);
+});
+
 test("ads from allowed accounts still follow the independent Ads setting", async (t) => {
   const h = await openFeed(t, {
     storage: { allowedAccounts: ["/company/space"] },
@@ -315,6 +330,23 @@ test("blocked posts are reevaluated when an author appears or a card is reused",
   await h.flush();
   assert.equal(visible(h, "reused"), true);
   assert.equal(visible(h, "later"), false);
+});
+
+test("a classic post is filtered when hydration marks its existing author link", async (t) => {
+  const h = await openFeed(t, {
+    storage: { hideFeed: false, blockedAccounts: ["/in/jane"] },
+    body: `<main class="scaffold-layout__main">
+      <article id="post" data-urn="urn:li:activity:1">
+        <div class="update-components-actor"><a href="/in/jane">Jane</a></div>
+      </article>
+    </main>`,
+  });
+  assert.equal(visible(h, "post"), true);
+
+  h.document.querySelector("#post a").classList.add("update-components-actor__meta-link");
+  await h.flush();
+
+  assert.equal(visible(h, "post"), false);
 });
 
 test("a stale initial read cannot overwrite a live block-list update", async (t) => {

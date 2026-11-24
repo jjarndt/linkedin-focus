@@ -139,7 +139,7 @@ const postAccounts = new WeakMap();
 const postActions = new WeakMap();
 
 function findReactActor(post) {
-  const card = post.querySelector(REACT_POST_CARD);
+  const card = post.matches(REACT_POST_CARD) ? post : post.querySelector(REACT_POST_CARD);
   if (!card) {
     const link = findActorLink(post, NEW_ACTOR_LINK);
     return { link, anchor: link };
@@ -420,21 +420,45 @@ window.addEventListener("popstate", scheduleScan);
 // Apply defaults synchronously at document_start (no FOUC), then reconcile with storage.
 applyState();
 
+const CLASSIC_MARKUP_CLASSES = [
+  "scaffold-layout__main",
+  "feed-shared-update-v2",
+  "update-components-actor",
+  "update-components-actor__meta",
+  "update-components-actor__sub-description",
+  "update-components-actor__description",
+  "update-components-actor__meta-link",
+  "feed-shared-actor__container-link",
+  "update-components-mini-update-v2",
+  "feed-shared-update-v2__reshared-content",
+];
+
 const observer = new MutationObserver((mutations) => {
-  for (const { target } of mutations) {
+  let needsScan = false;
+  for (const { target, attributeName, oldValue } of mutations) {
+    if (attributeName === "class") {
+      // Classic markup can hydrate by changing classes on existing elements.
+      // Ignore changes that only affect presentation or our own markers.
+      const previous = new Set((oldValue ?? "").split(/\s+/));
+      const markupChanged = CLASSIC_MARKUP_CLASSES.some((name) =>
+        previous.has(name) !== target.classList.contains(name));
+      if (!markupChanged) continue;
+    }
+    needsScan = true;
     let element = target.nodeType === Node.ELEMENT_NODE ? target : target.parentElement;
     for (; element; element = element.parentElement) {
       checked.delete(element);
       postAccounts.delete(element);
     }
   }
-  scheduleScan();
+  if (needsScan) scheduleScan();
 });
 observer.observe(document.documentElement, {
   childList: true,
   characterData: true,
   attributes: true,
-  attributeFilter: ["data-testid", "data-id", "data-urn", "data-lazy-mount-id", "componentkey", "data-view-name", "href", "role", "aria-haspopup"],
+  attributeOldValue: true,
+  attributeFilter: ["data-testid", "data-id", "data-urn", "data-lazy-mount-id", "componentkey", "data-view-name", "href", "role", "aria-haspopup", "class"],
   subtree: true,
 });
 
