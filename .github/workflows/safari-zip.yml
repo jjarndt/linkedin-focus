@@ -1,0 +1,40 @@
+name: Safari ZIP
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - ".github/workflows/safari-zip.yml"
+      - "scripts/build-safari-zip.py"
+      - "extension/**"
+      - "package.json"
+      - "package-lock.json"
+
+permissions: {}
+
+jobs:
+  package:
+    name: Build and verify Safari ZIP
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build ZIP from checked-out commit
+        env:
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: python3 scripts/build-safari-zip.py "$RUNNER_TEMP/linkedin-focus-safari.zip" --tag "$RELEASE_TAG"
+
+      - name: Upload Safari ZIP
+        if: github.ref_type == 'tag'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linkedin-focus-safari
+          path: ${{ runner.temp }}/linkedin-focus-safari.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

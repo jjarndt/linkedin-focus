@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-24
+
+### Added
+
+- Build and validate the Safari ZIP from version tags in GitHub Actions.
+
+### Fixed
+
+- Recognize post authors when React cards mount directly in the home feed or
+  the classic feed adds author classes to existing cards.
+- Keep account lists current while the popup is open, including when a change
+  arrives during startup. Saving an entry preserves focus if you switch lists.
+- Detect missing or stale resources before syncing the generated Xcode project
+  and check that the manifest references the required background scripts.
+
+## [1.3.0] - 2026-11-24
+
+### Added
+
+- Block posts from selected people or companies by URL, from the Safari popup
+  on an account page, or directly from the full home feed. The block list is
+  stored locally and takes precedence over the allow list.
+
 ## [1.2.0] - 2026-11-24
 
 ### Added
@@ -113,7 +136,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writable by the page: LinkedIn could have pinned it so the scan was skipped and
   an ad stayed visible, or frozen a "promoted" flag onto an organic post.
 
-[Unreleased]: https://github.com/jjarndt/linkedin-focus/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/jjarndt/linkedin-focus/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/jjarndt/linkedin-focus/compare/v1.3.0...v1.3.1
+[1.3.0]: https://github.com/jjarndt/linkedin-focus/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/jjarndt/linkedin-focus/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/jjarndt/linkedin-focus/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/jjarndt/linkedin-focus/releases/tag/v1.0.2
