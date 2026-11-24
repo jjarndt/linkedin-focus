@@ -25,7 +25,7 @@ function notifyActiveTab() {
   });
 }
 
-function initAccountList(key, stored, activeAccount) {
+async function initAccountList(key, settings, activeAccount) {
   const section = document.querySelector(`[data-account-list="${key}"]`);
   const form = section.querySelector("form");
   const controls = form.querySelector("fieldset");
@@ -34,7 +34,8 @@ function initAccountList(key, stored, activeAccount) {
   const status = section.querySelector('[role="status"]');
   const pageButton = section.querySelector(".page-account");
   const membership = key === "allowedAccounts" ? "allowed" : "blocked";
-  let accounts = normalizeAccounts(stored);
+  let accounts = [];
+  let revision = 0;
   let pageAccount = null;
 
   function renderPageButton() {
@@ -62,13 +63,24 @@ function initAccountList(key, stored, activeAccount) {
     }));
   }
 
+  function setAccounts(value) {
+    const next = normalizeAccounts(value);
+    if (next.length !== accounts.length || next.some((path, index) => path !== accounts[index])) {
+      accounts = next;
+      render();
+    }
+    renderPageButton();
+  }
+
   async function save(path, include, retryControl) {
     if (controls.disabled) return;
+    const revisionAtStart = revision;
+    const focusedBefore = document.activeElement;
     controls.disabled = true;
     renderPageButton();
     try {
-      accounts = await changeAccountList(api, key, path, include);
-      render();
+      const saved = await changeAccountList(api, key, path, include);
+      if (revision === revisionAtStart) setAccounts(saved);
       status.textContent = include ? "Account added." : "Account removed.";
       notifyActiveTab();
     } catch (e) {
@@ -78,7 +90,9 @@ function initAccountList(key, stored, activeAccount) {
     } finally {
       controls.disabled = false;
       renderPageButton();
-      (retryControl.isConnected && !retryControl.disabled ? retryControl : input).focus();
+      if (document.activeElement === focusedBefore || document.activeElement === document.body) {
+        (retryControl.isConnected && !retryControl.disabled ? retryControl : input).focus();
+      }
     }
     return true;
   }
@@ -103,8 +117,15 @@ function initAccountList(key, stored, activeAccount) {
     if (pageAccount) save(pageAccount, true, pageButton);
   });
   input.addEventListener("input", () => { status.textContent = ""; });
-  render();
+  api.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local" || !changes[key]) return;
+    revision++;
+    setAccounts(changes[key].newValue);
+  });
+
+  const state = await settings;
   controls.disabled = false;
+  if (revision === 0) setAccounts(state[key]);
   activeAccount.then((path) => {
     pageAccount = path;
     renderPageButton();
@@ -112,7 +133,11 @@ function initAccountList(key, stored, activeAccount) {
 }
 
 async function init() {
-  const state = await api.storage.local.get(SETTINGS_DEFAULTS);
+  const settings = api.storage.local.get(SETTINGS_DEFAULTS);
+  // The active tab may be outside LinkedIn or awaiting site access.
+  const activeAccount = messageActiveTab(GET_PAGE_ACCOUNT).then((path) => accountPath(path), () => null);
+  const lists = Object.keys(ACCOUNT_LIST_DEFAULTS).map((key) => initAccountList(key, settings, activeAccount));
+  const [state] = await Promise.all([settings, ...lists]);
   for (const key of Object.keys(DEFAULTS)) {
     const el = document.getElementById(key);
     let savedValue = coerce(key, state[key]);
@@ -133,11 +158,6 @@ async function init() {
       notifyActiveTab();
     });
     el.disabled = false;
-  }
-  // The active tab may be outside LinkedIn or awaiting site access.
-  const activeAccount = messageActiveTab(GET_PAGE_ACCOUNT).then((path) => accountPath(path), () => null);
-  for (const key of Object.keys(ACCOUNT_LIST_DEFAULTS)) {
-    initAccountList(key, state[key], activeAccount);
   }
 }
 

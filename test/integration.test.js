@@ -346,13 +346,14 @@ test("JS-applied element markers are styled too", () => {
   }
 });
 
-test("manifest loads shared.js before content.js", () => {
-  const js = MANIFEST.content_scripts[0].js;
-  assert.ok(js.includes("shared.js"), "shared.js not in content_scripts");
-  assert.ok(
-    js.indexOf("shared.js") < js.indexOf("content.js"),
-    "content.js reads DEFAULTS from shared.js — loading it first is a ReferenceError",
-  );
+test("manifest loads shared.js before the content and background scripts that need it", () => {
+  for (const [scripts, consumer] of [
+    [MANIFEST.content_scripts[0].js, "content.js"],
+    [MANIFEST.background.scripts, "background.js"],
+  ]) {
+    assert.ok(scripts.includes("shared.js"), `shared.js missing for ${consumer}`);
+    assert.ok(scripts.indexOf("shared.js") < scripts.indexOf(consumer), `shared.js must load before ${consumer}`);
+  }
 });
 
 test("content script runs at document_start", () => {
@@ -378,10 +379,9 @@ test("content script matches linkedin.com only", () => {
 });
 
 test("every file referenced by the manifest exists", () => {
-  const cs = MANIFEST.content_scripts[0];
   const referenced = [
-    ...cs.js,
-    ...cs.css,
+    ...MANIFEST.content_scripts.flatMap(({ js = [], css = [] }) => [...js, ...css]),
+    ...MANIFEST.background.scripts,
     MANIFEST.action.default_popup,
     ...Object.values(MANIFEST.icons),
   ];
