@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>How to hide the LinkedIn feed in Safari | LinkedIn Focus</title>
-  <meta name="description" content="Hide the LinkedIn feed, promoted posts, and sidebar ads in Safari on macOS with LinkedIn Focus, a free and open-source extension.">
+  <meta name="description" content="Hide the LinkedIn feed, ads, or posts from selected accounts in Safari on macOS with LinkedIn Focus, a free and open-source extension.">
   <link rel="canonical" href="https://jjarndt.github.io/linkedin-focus/">
   <meta property="og:title" content="How to hide the LinkedIn feed in Safari">
-  <meta property="og:description" content="An open-source Safari extension for hiding the LinkedIn feed, promoted posts, and notification badges.">
+  <meta property="og:description" content="Hide the LinkedIn feed, ads, and badges, or allow and block posts from selected accounts in Safari.">
   <meta property="og:url" content="https://jjarndt.github.io/linkedin-focus/">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://jjarndt.github.io/linkedin-focus/linkedin-focus-demo.gif">
@@ -117,7 +117,7 @@
     <header>
       <a class="project" href="https://github.com/jjarndt/linkedin-focus">LinkedIn Focus</a>
       <h1>How to hide the LinkedIn feed in Safari</h1>
-      <p>LinkedIn Focus is a free, open-source Safari extension for macOS. Hide the home feed, promoted posts and sidebar ads, news and games, or notification badges. Messaging and profiles stay available.</p>
+      <p>LinkedIn Focus is a free, open-source Safari extension for macOS. Hide the home feed, promoted posts and sidebar ads, news and games, or notification badges. Allow or block posts from selected people and companies. Messaging and profiles stay available.</p>
     </header>
     <nav aria-label="Project links">
       <a class="primary" href="#try-in-safari">Try in Safari</a>
@@ -143,8 +143,12 @@
         <li>On LinkedIn, click the LinkedIn Focus toolbar icon in Safari.</li>
         <li>Turn on <strong>Feed / Timeline</strong> to hide the feed without reloading the page.</li>
       </ol>
-      <p>To keep posts from specific people or companies visible, open their profile or company page and click <strong>Allow this account</strong> in the Safari popup. In the full feed, the same button appears beside the author of a post. You can also paste a LinkedIn URL under <strong>Allowed accounts</strong>.</p>
-      <p>Safari stores the list locally. The filter applies to posts LinkedIn loads into your feed.</p>
+    </section>
+    <section aria-labelledby="accounts">
+      <h2 id="accounts">Allow or block posts from specific accounts</h2>
+      <p>Open a profile or company page and click <strong>Allow this account</strong> or <strong>Block this account</strong> in the Safari popup. Both buttons also appear beside authors in the full feed. You can also paste a LinkedIn profile or company URL under <strong>Allowed accounts</strong> or <strong>Blocked accounts</strong> and click <strong>Add</strong>.</p>
+      <p>Allowed posts stay visible while <strong>Feed / Timeline</strong> is on. Blocking hides posts in both feed modes and takes precedence if an account is on both lists. The filters apply to posts LinkedIn loads into your home feed.</p>
+      <p>Safari stores both lists locally and applies changes without reloading LinkedIn. Click <strong>Remove</strong> next to an entry to take it off either list.</p>
     </section>
     <section aria-labelledby="ads">
       <h2 id="ads">Can I block LinkedIn ads and keep the feed?</h2>

@@ -3,8 +3,9 @@
 LinkedIn Focus is a LinkedIn feed blocker for Safari on macOS. It hides the
 feed, promoted posts, the news and games rail, and notification badges so you
 can use messaging and profiles without the pull of the timeline. Four
-independent popup toggles are on by default. Add people or companies to
-**Allowed accounts** to keep their posts visible in the hidden feed.
+independent popup toggles are on by default. Use **Allowed accounts** to keep
+posts from selected people or companies visible in a hidden feed, or use
+**Blocked accounts** to hide their posts from the home feed.
 
 [![CI](https://github.com/jjarndt/linkedin-focus/actions/workflows/ci.yml/badge.svg)](https://github.com/jjarndt/linkedin-focus/actions/workflows/ci.yml)
 
@@ -26,8 +27,9 @@ independent popup toggles are on by default. Add people or companies to
 Four independent toggles, each applied instantly across all open tabs (no reload)
 and persisted in `storage.local`:
 
-- **Feed / Timeline** — hides the feed. With **Allowed accounts**, it shows
-  posts from those authors. Profiles and messaging stay available.
+- **Feed / Timeline** — hides the home feed. With **Allowed accounts**, it
+  shows posts from those authors. Posts from **Blocked accounts** stay hidden
+  in both feed modes. Profiles and messaging stay available.
 - **Ads** — promoted posts (detected in JavaScript by their label text, German
   and English) plus sidebar advertisements.
 - **News & Games** — the "LinkedIn News" module and the daily-games box in the
@@ -44,12 +46,19 @@ On a LinkedIn profile or company page, open the Safari popup and click
 the author of a post. You can also paste a profile or company URL into
 **Allowed accounts** and click **Add**.
 
-Turn on **Feed / Timeline** to show only posts from allowed accounts. Click
-**Remove** next to an account in the popup to take it off the list. Safari
-stores the list locally and applies changes without reloading LinkedIn.
+Turn on **Feed / Timeline** to keep posts from allowed accounts visible in the
+hidden feed. The **Ads** toggle still controls promoted posts from those accounts.
 
-The allow-list filters posts LinkedIn loads into your home feed. The **Ads**
-toggle still controls promoted posts, including those from allowed accounts.
+### How do I hide posts from specific accounts?
+
+On a profile or company page, open the Safari popup and click **Block this
+account**. In the full feed, the same button appears next to the author. You
+can also paste a LinkedIn profile or company URL into **Blocked accounts** and
+click **Add**. Blocking takes precedence if an account is on both lists.
+
+Both lists apply to posts LinkedIn loads into your home feed. Safari stores
+the lists locally and applies changes without reloading LinkedIn. To take an
+account off either list, click **Remove** next to its entry in the popup.
 
 ### Can I block LinkedIn ads without hiding the feed?
 
@@ -58,8 +67,8 @@ popup. This hides promoted posts and sidebar ads while keeping the feed visible.
 
 ## Scope
 
-LinkedIn Focus hides distractions on LinkedIn in Safari on macOS. The feed
-filter supports exceptions for selected people and companies.
+LinkedIn Focus hides distractions on LinkedIn in Safari on macOS. The home
+feed filter can show or hide posts from selected people and companies.
 
 ## Non-Goals
 
@@ -76,7 +85,7 @@ discussion.
   browser.
 - **No user-configurable selectors.** The extension defines its selectors
   in `extension/content.js` and `extension/styles.css`. `storage.local` holds
-  the four toggle values and the list of allowed account paths.
+  the four toggle values and the allowed and blocked account paths.
 - **No network access and no telemetry.** The extension uses the `storage`
   permission for settings and account paths. The extension code makes no
   network requests.
@@ -130,7 +139,7 @@ targets, `Cmd-R`, then enable the extension in Safari's settings and allow it on
 ## How it works
 
 - **Manifest V3.** The popup writes toggles to `storage.local`. A nonpersistent
-  background page serializes allow-list edits from the popup and feed. The
+  background page serializes account-list edits from the popup and feed. The
   content script reacts to storage changes and applies the hiding rules from
   `styles.css`.
 - **No feed flash.** The content script and stylesheet are injected at
@@ -230,13 +239,20 @@ v1.2.0, copy `extension/background.js` into the generated extension's
 `Resources` directory and add it to the extension target's **Copy Bundle
 Resources** before syncing. You can also generate a fresh project.
 
+## Packaging a release
+
+Update the version in `extension/manifest.json`, `package.json`, and
+`package-lock.json`. After merging, push a matching `vX.Y.Z` tag. Download
+`linkedin-focus-safari.zip` from the successful [Safari ZIP workflow](https://github.com/jjarndt/linkedin-focus/actions/workflows/safari-zip.yml)
+run for that tag and attach it to the GitHub release.
+
 ## Disclaimer
 
 This is an independent, unofficial project. It is **not** affiliated with,
 endorsed by, sponsored by, or connected to LinkedIn or Microsoft in any way.
 "LinkedIn" is a trademark of Microsoft Corporation. The extension reads profile
 and company paths from supported pages and filters posts in your browser.
-Settings and the allow-list stay on your device. Changes to LinkedIn's page
+Settings and both account lists stay on your device. Changes to LinkedIn's page
 structure can affect detection.
 
 ## License
