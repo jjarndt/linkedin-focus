@@ -44,18 +44,18 @@ function visible(h, id) {
 test("account paths normalize LinkedIn URLs and deduplicate tracking variants", async (t) => {
   const h = await loadExtension();
   t.after(h.close);
-  const { accountPath, normalizeAllowedAccounts } = h.lf;
+  const { accountPath, normalizeAccounts } = h.lf;
   assert.equal(accountPath("  https://de.linkedin.com/in/Jane-Doe/?trk=profile#top  "), "/in/jane-doe");
   assert.equal(accountPath("linkedin.com/company/Example-Inc/"), "/company/example-inc");
   assert.equal(accountPath("/IN/Jos%C3%A9"), "/in/jos%C3%A9");
-  assert.deepEqual(Array.from(normalizeAllowedAccounts([
+  assert.deepEqual(Array.from(normalizeAccounts([
     "/in/jane",
     "https://www.linkedin.com/in/JANE/",
     "/company/jane",
     7,
     "https://example.com/in/jane",
   ])), ["/in/jane", "/company/jane"]);
-  assert.deepEqual(Array.from(normalizeAllowedAccounts("/in/jane")), []);
+  assert.deepEqual(Array.from(normalizeAccounts("/in/jane")), []);
 });
 
 test("account paths reject non-account URLs, invalid slugs and unrelated hosts", async (t) => {
@@ -234,4 +234,101 @@ test("classic profile activity stays visible outside the feed route", async (t) 
 
   assert.equal(visible(h, "activity"), true);
   assert.equal(h.htmlClasses().has("lf-filter-feed"), false);
+});
+
+test("the full React feed hides only posts with an exact blocked primary author", async (t) => {
+  const h = await openFeed(t, {
+    storage: { hideFeed: false, blockedAccounts: ["https://de.linkedin.com/in/Jane/?trk=feed", "/company/example"] },
+    body: newShellFeed([
+      reactPost("person", { actor: "/in/jane" }),
+      reactPost("company", { actor: "/company/example/" }),
+      reactPost("similar", { actor: "/in/jane-doe" }),
+      reactPost("sameSlug", { actor: "/in/example" }),
+      reactPost("mention", { actor: "/in/other", content: '<p><a href="/in/jane">Jane</a></p>' }),
+      reactPost("quote", {
+        actor: "/in/other",
+        content: '<blockquote><a data-view-name="feed-actor-name" href="/in/jane">Jane</a></blockquote>',
+      }),
+      reactPost("unknown"),
+    ]),
+  });
+
+  for (const id of ["person", "company"]) assert.equal(visible(h, id), false, id);
+  for (const id of ["similar", "sameSlug", "mention", "quote", "unknown"]) {
+    assert.equal(visible(h, id), true, id);
+  }
+});
+
+test("blocking overrides an allowed account until it is removed from the block list", async (t) => {
+  const h = await openFeed(t, {
+    storage: { allowedAccounts: ["/in/jane"], blockedAccounts: ["/in/jane"] },
+    body: newShellFeed([
+      reactPost("jane", { actor: "/in/jane" }),
+      reactPost("other", { actor: "/in/other" }),
+    ]),
+  });
+  assert.equal(visible(h, "jane"), false);
+  assert.equal(visible(h, "other"), false);
+
+  await h.storage.local.set({ hideFeed: false });
+  assert.equal(visible(h, "jane"), false);
+  assert.equal(visible(h, "other"), true);
+
+  await h.storage.local.set({ hideFeed: true });
+  await h.storage.local.remove("blockedAccounts");
+  assert.equal(visible(h, "jane"), true);
+  assert.equal(visible(h, "other"), false);
+});
+
+test("classic blocking hides the outer post and stops applying when navigating to a profile", async (t) => {
+  const h = await openFeed(t, {
+    storage: { hideFeed: false, blockedAccounts: ["/company/example"] },
+    body: `<main class="scaffold-layout__main">
+      ${emberPost("blocked", "/company/example", '<div id="nested" class="feed-shared-update-v2">Nested content</div>')}
+      ${emberPost("visible", "/company/example-partner")}
+    </main>`,
+  });
+  assert.equal(visible(h, "blocked"), false);
+  assert.equal(visible(h, "nested"), false);
+  assert.equal(visible(h, "visible"), true);
+
+  h.window.history.pushState({}, "", "/company/example/");
+  h.window.dispatchEvent(new h.window.PopStateEvent("popstate"));
+  await h.flush();
+  assert.equal(visible(h, "blocked"), true);
+});
+
+test("blocked posts are reevaluated when an author appears or a card is reused", async (t) => {
+  const h = await openFeed(t, {
+    storage: { hideFeed: false, blockedAccounts: ["/in/jane"] },
+    body: newShellFeed([reactPost("reused")]),
+  });
+  const post = h.document.getElementById("reused");
+  assert.equal(visible(h, "reused"), true);
+
+  post.firstElementChild.innerHTML = '<a data-view-name="feed-actor-name" href="/in/jane">Jane</a>';
+  await h.flush();
+  assert.equal(visible(h, "reused"), false);
+
+  post.querySelector("a").setAttribute("href", "/in/other");
+  post.parentElement.insertAdjacentHTML("beforeend", reactPost("later", { actor: "/in/jane" }));
+  await h.flush();
+  assert.equal(visible(h, "reused"), true);
+  assert.equal(visible(h, "later"), false);
+});
+
+test("a stale initial read cannot overwrite a live block-list update", async (t) => {
+  const h = await openFeed(t, {
+    storage: { hideFeed: false, blockedAccounts: ["/in/jane"] },
+    autoResolveGet: false,
+    body: newShellFeed([
+      reactPost("jane", { actor: "/in/jane" }),
+      reactPost("other", { actor: "/in/other" }),
+    ]),
+  });
+  await h.storage.local.set({ blockedAccounts: ["/in/other"] });
+  h.resolveInitialGet();
+  await h.flush();
+  assert.equal(visible(h, "jane"), true);
+  assert.equal(visible(h, "other"), false);
 });

@@ -479,14 +479,15 @@ test("popup.html ships the English reference wording as its fallback", async () 
   h.close();
 });
 
-async function addAccount(h, url) {
-  h.document.getElementById("accountUrl").value = url;
-  h.document.querySelector("#allowedAccountsForm button[type=submit]").click();
+async function addAccount(h, url, key = "allowedAccounts") {
+  const form = h.document.getElementById(`${key}Form`);
+  form.querySelector("input").value = url;
+  form.querySelector("button[type=submit]").click();
   await h.flush();
 }
 
-function listedAccounts(h) {
-  return [...h.document.querySelectorAll("#allowedAccountsList li span")].map((label) => label.textContent);
+function listedAccounts(h, key = "allowedAccounts") {
+  return [...h.document.querySelectorAll(`#${key}List li span`)].map((label) => label.textContent);
 }
 
 test("allowed accounts persist across reopened popups and can be removed individually", async (t) => {
@@ -597,6 +598,7 @@ test("the popup hides the shortcut on unsupported pages and when there is no rec
     const h = await loadPopup({ pageAccount });
     t.after(h.close);
     assert.equal(h.document.getElementById("allowPageAccount").hidden, true);
+    assert.equal(h.document.getElementById("blockPageAccount").hidden, true);
     assert.deepEqual(h.errors, []);
   }
 });
@@ -617,4 +619,57 @@ test("a failed page shortcut write can be retried with the same account", async 
   await h.flush();
   assert.deepEqual(listedAccounts(h), ["/company/example"]);
   assert.equal(button.disabled, true);
+});
+
+test("blocked accounts persist after reopening and removal leaves the allow list intact", async (t) => {
+  const initial = await loadPopup({ storage: { allowedAccounts: ["/in/alex"] } });
+  t.after(initial.close);
+  await addAccount(initial, "https://www.linkedin.com/in/Alex/?trk=feed", "blockedAccounts");
+  await addAccount(initial, "https://uk.linkedin.com/company/Example/", "blockedAccounts");
+  assert.deepEqual(initial.storageData, {
+    allowedAccounts: ["/in/alex"],
+    blockedAccounts: ["/in/alex", "/company/example"],
+  });
+  assert.equal(initial.sentMessages.at(-1).message, "refreshSettings");
+
+  const reopened = await loadPopup({ storage: initial.storageData });
+  t.after(reopened.close);
+  assert.deepEqual(listedAccounts(reopened, "blockedAccounts"), ["/in/alex", "/company/example"]);
+  reopened.document.querySelector('#blockedAccountsList [aria-label="Remove /in/alex"]').click();
+  await reopened.flush();
+  assert.deepEqual(listedAccounts(reopened), ["/in/alex"]);
+  assert.deepEqual(listedAccounts(reopened, "blockedAccounts"), ["/company/example"]);
+  assert.deepEqual(reopened.setCalls, [{ blockedAccounts: ["/company/example"] }]);
+});
+
+test("the block form rejects unrelated URLs and normalized duplicates", async (t) => {
+  const h = await loadPopup({ storage: { blockedAccounts: ["/in/alex"] } });
+  t.after(h.close);
+  const status = h.document.getElementById("blockedAccountStatus");
+  await addAccount(h, "https://example.test/in/alex", "blockedAccounts");
+  assert.equal(status.textContent, "Enter a LinkedIn profile or company URL.");
+  await addAccount(h, "https://de.linkedin.com/in/ALEX/", "blockedAccounts");
+  assert.equal(status.textContent, "This account is already blocked.");
+  assert.deepEqual(h.setCalls, []);
+});
+
+test("the profile shortcut saves only the block list and can retry a failed write", async (t) => {
+  const h = await loadPopup({ pageAccount: "/in/alex", storage: { allowedAccounts: ["/in/alex"] } });
+  t.after(h.close);
+  const block = h.document.getElementById("blockPageAccount");
+  assert.equal(block.hidden, false);
+  h.failNextWrite(new Error("storage unavailable"));
+  block.click();
+  await h.flush();
+  assert.equal(h.document.getElementById("blockedAccountStatus").textContent, "Could not save your blocked accounts. Try again.");
+  assert.equal(block.disabled, false);
+  assert.equal(h.storageData.blockedAccounts, undefined);
+  assert.deepEqual(h.sentMessages, []);
+
+  block.click();
+  await h.flush();
+  assert.deepEqual(h.storageData, { allowedAccounts: ["/in/alex"], blockedAccounts: ["/in/alex"] });
+  assert.equal(block.textContent, "Account blocked");
+  assert.equal(block.disabled, true);
+  assert.equal(h.document.getElementById("allowPageAccount").textContent, "Account allowed");
 });

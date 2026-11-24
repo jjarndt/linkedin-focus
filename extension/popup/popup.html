@@ -47,10 +47,10 @@
     </li>
   </ul>
 
-  <section class="accounts" aria-labelledby="allowedAccountsHeading">
+  <section class="accounts" data-account-list="allowedAccounts" aria-labelledby="allowedAccountsHeading">
     <h2 id="allowedAccountsHeading" data-i18n="allowedAccountsHeading">Allowed accounts</h2>
     <p class="hint" id="allowedAccountsHint" data-i18n="allowedAccountsHint">See posts from these accounts while the feed is hidden.</p>
-    <button type="button" id="allowPageAccount" hidden>Allow this account</button>
+    <button type="button" id="allowPageAccount" class="page-account" hidden>Allow this account</button>
     <form id="allowedAccountsForm">
       <fieldset id="allowedAccountsControls" disabled>
         <label for="accountUrl" data-i18n="accountUrl">LinkedIn profile or company URL</label>
@@ -62,6 +62,23 @@
       </fieldset>
     </form>
     <p id="accountStatus" class="hint" role="status"></p>
+  </section>
+
+  <section class="accounts" data-account-list="blockedAccounts" aria-labelledby="blockedAccountsHeading">
+    <h2 id="blockedAccountsHeading" data-i18n="blockedAccountsHeading">Blocked accounts</h2>
+    <p class="hint" id="blockedAccountsHint" data-i18n="blockedAccountsHint">Hide posts from these accounts in your feed, even if they're on the allowed list.</p>
+    <button type="button" id="blockPageAccount" class="page-account" hidden>Block this account</button>
+    <form id="blockedAccountsForm">
+      <fieldset id="blockedAccountsControls" disabled>
+        <label for="blockedAccountUrl" data-i18n="accountUrl">LinkedIn profile or company URL</label>
+        <div class="account-entry">
+          <input type="text" id="blockedAccountUrl" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="blockedAccountsHint" required>
+          <button type="submit" data-i18n="addAccount">Add</button>
+        </div>
+        <ul id="blockedAccountsList" class="account-list"></ul>
+      </fieldset>
+    </form>
+    <p id="blockedAccountStatus" class="hint" role="status"></p>
   </section>
 
   <script src="../shared.js"></script>
