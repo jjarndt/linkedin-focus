@@ -46,11 +46,11 @@ export function connectBackground(storage) {
 // testing nothing.
 const EPILOGUE = `
 ;window.__lf = {
-  coerce, accountPath, normalizeAllowedAccounts, applyState, isFeedPage, scheduleScan,
+  coerce, accountPath, normalizeAccounts, applyState, isFeedPage, scheduleScan,
   markAdsClassic, markAdsNewShell, markNews,
   findMarkedModules, collapseToSharedCard, outermostSingleChildWrapper,
   CLASS_MAP, DEFAULTS, NEWS_MARKERS, FEED_PATHS,
-  allowPostAccount, findReactActor, postActions,
+  addPostAccount, findReactActor, postActions,
   get currentState() { return currentState; },
 };
 `;

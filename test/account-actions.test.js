@@ -2,26 +2,27 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { connectBackground, loadExtension, newShellFeed } from "./harness.js";
 
-function change(path, allowed = true) {
-  return { type: "changeAllowedAccount", path, allowed };
+function change(path, include = true, list = "allowedAccounts") {
+  return { type: "changeAccountList", list, path, include };
 }
 
-function background(initial) {
-  let accounts = initial;
+function background(initial = {}) {
+  const accounts = { ...initial };
   let shouldFail = false;
   const writes = [];
   const send = connectBackground({
     local: {
-      async get() {
-        return { allowedAccounts: [...accounts] };
+      async get(defaults) {
+        return { ...defaults, ...accounts };
       },
       async set(update) {
         if (shouldFail) {
           shouldFail = false;
           throw new Error("storage unavailable");
         }
-        accounts = [...update.allowedAccounts];
-        writes.push(accounts);
+        const saved = structuredClone(update);
+        Object.assign(accounts, saved);
+        writes.push(saved);
       },
     },
   });
@@ -29,7 +30,7 @@ function background(initial) {
 }
 
 test("overlapping adds and removes preserve unrelated existing accounts", async () => {
-  const h = background(["/in/keep", "/company/remove-me"]);
+  const h = background({ allowedAccounts: ["/in/keep", "/company/remove-me"] });
   const results = await Promise.all([
     h.send(change("/in/new-author")),
     h.send(change("/company/remove-me", false)),
@@ -41,16 +42,18 @@ test("overlapping adds and removes preserve unrelated existing accounts", async 
 });
 
 test("invalid mutations are rejected and repeated verified adds are idempotent", async () => {
-  const h = background(["/in/example"]);
+  const h = background({ allowedAccounts: ["/in/example"] });
   assert.equal(await h.send(change("https://example.test/in/other")), null);
   assert.equal(await h.send(change("/in/example", "false")), null);
+  assert.equal(await h.send(change("/in/example", true, "hideFeed")), null);
+  assert.equal(await h.send(change("/in/example", true, "__proto__")), null);
   assert.deepEqual(await h.send(change("/in/EXAMPLE/")), ["/in/example"]);
   assert.deepEqual(await h.send(change("/company/missing", false)), ["/in/example"]);
   assert.deepEqual(h.writes, []);
 });
 
 test("a failed write leaves the old list intact and the next request can retry", async () => {
-  const h = background(["/company/existing"]);
+  const h = background({ allowedAccounts: ["/company/existing"] });
   h.failNextWrite();
   const [failed, next] = await Promise.all([
     h.send(change("/company/existing", false)),
@@ -59,6 +62,24 @@ test("a failed write leaves the old list intact and the next request can retry",
   assert.equal(failed, null);
   assert.deepEqual(next, ["/company/existing", "/in/new"]);
   assert.deepEqual(await h.send(change("/company/existing", false)), ["/in/new"]);
+});
+
+test("overlapping mutations preserve both lists and write only the list being edited", async () => {
+  const h = background({ allowedAccounts: ["/in/keep"], blockedAccounts: ["/in/unblock"] });
+  const [allowed, firstBlocked, secondBlocked, remaining] = await Promise.all([
+    h.send(change("/in/both")),
+    h.send(change("/in/both", true, "blockedAccounts")),
+    h.send(change("https://de.linkedin.com/company/EXAMPLE/?trk=feed", true, "blockedAccounts")),
+    h.send(change("/in/unblock", false, "blockedAccounts")),
+  ]);
+
+  assert.deepEqual(allowed, ["/in/keep", "/in/both"]);
+  assert.deepEqual(firstBlocked, ["/in/unblock", "/in/both"]);
+  assert.deepEqual(secondBlocked, ["/in/unblock", "/in/both", "/company/example"]);
+  assert.deepEqual(remaining, ["/in/both", "/company/example"]);
+  assert.deepEqual(h.writes.map(Object.keys), [
+    ["allowedAccounts"], ["blockedAccounts"], ["blockedAccounts"], ["blockedAccounts"],
+  ]);
 });
 
 test("the page account follows the current SPA route and reports only account pages", async (t) => {
@@ -87,53 +108,73 @@ function feed() {
   return loadExtension({ body: newShellFeed([reactPost]), storage: { hideFeed: false } });
 }
 
-test("one action is attached to the primary author and script-generated clicks are ignored", async (t) => {
+test("both actions are attached to the primary author and script-generated clicks are ignored", async (t) => {
   const h = await feed();
   t.after(h.close);
-  const buttons = h.document.querySelectorAll(".lf-post-account");
-  assert.equal(buttons.length, 1);
-  assert.equal(buttons[0].previousElementSibling.id, "author-header");
-  assert.equal(buttons[0].getAttribute("aria-label"), "Allow this account: /in/alex");
-  buttons[0].click();
+  const group = h.document.querySelector(".lf-post-account-actions");
+  assert.equal(group.previousElementSibling.id, "author-header");
+  assert.deepEqual(
+    [...group.children].map((button) => button.getAttribute("aria-label")),
+    ["Allow this account: /in/alex", "Block this account: /in/alex"],
+  );
+  for (const button of group.children) button.click();
   await h.flush();
   assert.equal(h.storageData.allowedAccounts, undefined);
+  assert.equal(h.storageData.blockedAccounts, undefined);
 });
 
 test("a trusted feed action persists the primary author and reflects later removal", async (t) => {
   const h = await feed();
   t.after(h.close);
   const post = h.document.getElementById("post");
-  const action = h.lf.postActions.get(post);
+  const actions = h.lf.postActions.get(post);
+  const button = actions.buttons.allowedAccounts;
   const click = { isTrusted: true, stopPropagation() {} };
 
-  await h.lf.allowPostAccount(click, action, post, h.lf.findReactActor);
+  await h.lf.addPostAccount(click, "allowedAccounts", actions, post, h.lf.findReactActor);
   assert.deepEqual(Array.from(h.storageData.allowedAccounts), ["/in/alex"]);
-  assert.equal(action.button.textContent, "Account allowed");
-  assert.equal(action.button.disabled, true);
+  assert.equal(button.textContent, "Account allowed");
+  assert.equal(button.disabled, true);
 
   await h.storage.local.remove("allowedAccounts");
   await h.flush();
-  assert.equal(action.button.textContent, "Allow this account");
-  assert.equal(action.button.disabled, false);
+  assert.equal(button.textContent, "Allow this account");
+  assert.equal(button.disabled, false);
 });
 
-test("recycled cards reject stale clicks and rebind a single action to the new author", async (t) => {
+test("a trusted block action persists the author and immediately marks the post hidden", async (t) => {
   const h = await feed();
   t.after(h.close);
   const post = h.document.getElementById("post");
-  const oldAction = h.lf.postActions.get(post);
-  h.document.getElementById("author").setAttribute("href", "/company/new-author");
+  const actions = h.lf.postActions.get(post);
+  const click = { isTrusted: true, stopPropagation() {} };
 
-  await h.lf.allowPostAccount({ isTrusted: true }, oldAction, post, h.lf.findReactActor);
+  await h.lf.addPostAccount(click, "blockedAccounts", actions, post, h.lf.findReactActor);
+  assert.deepEqual(Array.from(h.storageData.blockedAccounts), ["/in/alex"]);
   assert.equal(h.storageData.allowedAccounts, undefined);
-
-  await h.flush();
-  assert.equal(oldAction.button.isConnected, false);
-  assert.equal(post.querySelectorAll(".lf-post-account").length, 1);
-  assert.equal(post.querySelector(".lf-post-account").getAttribute("aria-label"), "Allow this account: /company/new-author");
+  assert.equal(post.classList.contains("lf-blocked-post"), true);
+  assert.equal(actions.buttons.blockedAccounts.disabled, true);
 });
 
-test("classic feed shows a single action even when two wrappers identify the same post", async (t) => {
+test("recycled cards reject stale clicks and rebind the actions to the new author", async (t) => {
+  const h = await feed();
+  t.after(h.close);
+  const post = h.document.getElementById("post");
+  const oldActions = h.lf.postActions.get(post);
+  h.document.getElementById("author").setAttribute("href", "/company/new-author");
+
+  await h.lf.addPostAccount({ isTrusted: true }, "allowedAccounts", oldActions, post, h.lf.findReactActor);
+  await h.lf.addPostAccount({ isTrusted: true }, "blockedAccounts", oldActions, post, h.lf.findReactActor);
+  assert.equal(h.storageData.allowedAccounts, undefined);
+  assert.equal(h.storageData.blockedAccounts, undefined);
+
+  await h.flush();
+  assert.equal(oldActions.container.isConnected, false);
+  assert.equal(post.querySelectorAll(".lf-post-account-actions").length, 1);
+  assert.ok(post.querySelector('[aria-label="Block this account: /company/new-author"]'));
+});
+
+test("classic feed shows one action group even when two wrappers identify the same post", async (t) => {
   const h = await loadExtension({
     storage: { hideFeed: false },
     body: `<main class="scaffold-layout__main"><article data-id="urn:li:activity:1">
@@ -144,9 +185,9 @@ test("classic feed shows a single action even when two wrappers identify the sam
   });
   t.after(h.close);
 
-  const buttons = h.document.querySelectorAll(".lf-post-account");
-  assert.equal(buttons.length, 1);
-  assert.equal(buttons[0].getAttribute("aria-label"), "Allow this account: /company/example");
+  assert.equal(h.document.querySelectorAll(".lf-post-account-actions").length, 1);
+  assert.ok(h.document.querySelector('[aria-label="Allow this account: /company/example"]'));
+  assert.ok(h.document.querySelector('[aria-label="Block this account: /company/example"]'));
 });
 
 test("the injected action is absent while initially hiding the feed", async (t) => {

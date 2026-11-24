@@ -33,7 +33,7 @@ function log(...args) {
 }
 
 let currentState = { ...DEFAULTS };
-let allowedAccounts = new Set();
+const accountLists = { allowedAccounts: new Set(), blockedAccounts: new Set() };
 
 // Classic shell reuses .scaffold-layout__main on profile/messaging pages, so the
 // feed rule there must be scoped to the feed route. The new shell needs no
@@ -168,57 +168,69 @@ function findPostAccount(post, findActor) {
   return path ? { path, anchor } : null;
 }
 
-function renderPostAction(action) {
-  const allowed = allowedAccounts.has(action.path);
-  action.button.disabled = action.pending || allowed;
-  const label = allowed ? "Account allowed" : action.failed ? "Try again" : "Allow this account";
-  if (action.button.textContent !== label) {
-    action.button.textContent = label;
-    action.button.setAttribute("aria-label", `${label}: ${decodeURIComponent(action.path)}`);
+function renderPostActions(actions) {
+  for (const [list, button] of Object.entries(actions.buttons)) {
+    const included = accountLists[list].has(actions.path);
+    button.disabled = actions.pending || included;
+    const label = !included && actions.failedList === list
+      ? `Retry ${list === "allowedAccounts" ? "allowing" : "blocking"}`
+      : accountActionLabel(list, included);
+    if (button.textContent !== label) {
+      button.textContent = label;
+      button.setAttribute("aria-label", `${label}: ${decodeURIComponent(actions.path)}`);
+    }
   }
 }
 
-async function allowPostAccount(event, action, post, findActor) {
+async function addPostAccount(event, list, actions, post, findActor) {
   // The page can dispatch clicks on injected buttons. Save only on a real user
   // action and recheck the author in case LinkedIn has recycled the card.
-  if (!event.isTrusted || action.button.disabled || currentState.hideFeed || !isFeedPage()) return;
+  const button = actions.buttons[list];
+  if (!event.isTrusted || button.disabled || currentState.hideFeed || !isFeedPage()) return;
   const account = findPostAccount(post, findActor);
-  if (account?.path !== action.path || account.anchor.nextElementSibling !== action.button) return;
+  if (account?.path !== actions.path || account.anchor.nextElementSibling !== actions.container) return;
+  if (button.parentElement !== actions.container) return;
   event.stopPropagation();
-  action.pending = true;
-  action.failed = false;
-  renderPostAction(action);
+  actions.pending = true;
+  actions.failedList = null;
+  renderPostActions(actions);
   try {
-    await changeAllowedAccount(api, action.path, true);
+    await changeAccountList(api, list, actions.path, true);
     await refreshState();
   } catch (e) {
-    action.failed = true;
-    log("allow account failed", e);
+    actions.failedList = list;
+    log("account update failed", e);
   } finally {
-    action.pending = false;
-    renderPostAction(action);
+    actions.pending = false;
+    renderPostActions(actions);
   }
 }
 
-function updatePostAction(post, account, findActor) {
-  let action = postActions.get(post);
-  if (action && (action.path !== account?.path || action.anchor !== account.anchor)) {
-    action.button.remove();
+function updatePostActions(post, account, findActor) {
+  let actions = postActions.get(post);
+  if (actions && (actions.path !== account?.path || actions.anchor !== account.anchor)) {
+    actions.container.remove();
     postActions.delete(post);
-    action = null;
+    actions = null;
   }
   if (!account) return;
-  if (!action) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "lf-post-account";
-    const newAction = { ...account, button, pending: false, failed: false };
-    button.addEventListener("click", (event) => allowPostAccount(event, newAction, post, findActor));
-    postActions.set(post, newAction);
-    action = newAction;
+  if (!actions) {
+    const container = document.createElement("div");
+    container.className = "lf-post-account-actions";
+    const newActions = { ...account, container, buttons: {}, pending: false, failedList: null };
+    for (const list of Object.keys(accountLists)) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "lf-post-account";
+      button.addEventListener("click", (event) => addPostAccount(event, list, newActions, post, findActor));
+      newActions.buttons[list] = button;
+      container.append(button);
+    }
+    postActions.set(post, newActions);
+    actions = newActions;
   }
-  renderPostAction(action);
-  if (action.anchor.nextElementSibling !== action.button) action.anchor.after(action.button);
+  renderPostActions(actions);
+  if (actions.anchor.nextElementSibling !== actions.container) actions.anchor.after(actions.container);
 }
 
 function updatePost(post, findActor, filtering) {
@@ -226,13 +238,14 @@ function updatePost(post, findActor, filtering) {
     postAccounts.set(post, findPostAccount(post, findActor));
   }
   const account = postAccounts.get(post);
-  if (filtering) post.classList.toggle("lf-allowed-post", allowedAccounts.has(account?.path));
-  if (!currentState.hideFeed) updatePostAction(post, account, findActor);
+  if (filtering) post.classList.toggle("lf-allowed-post", accountLists.allowedAccounts.has(account?.path));
+  post.classList.toggle("lf-blocked-post", accountLists.blockedAccounts.has(account?.path));
+  if (!currentState.hideFeed) updatePostActions(post, account, findActor);
 }
 
 function updateFeed() {
   const feedPage = isFeedPage();
-  const filtering = feedPage && currentState.hideFeed && allowedAccounts.size > 0;
+  const filtering = feedPage && currentState.hideFeed && accountLists.allowedAccounts.size > 0;
   if (filtering || (feedPage && !currentState.hideFeed)) {
     for (const post of document.querySelectorAll(NEW_FEED_ITEMS)) {
       updatePost(post, findReactActor, filtering);
@@ -361,8 +374,8 @@ async function refreshState() {
     for (const key of Object.keys(CLASS_MAP)) {
       if (!liveKeys.has(key)) currentState[key] = coerce(key, stored[key]);
     }
-    if (!liveKeys.has("allowedAccounts")) {
-      allowedAccounts = new Set(normalizeAllowedAccounts(stored.allowedAccounts));
+    for (const list of Object.keys(accountLists)) {
+      if (!liveKeys.has(list)) accountLists[list] = new Set(normalizeAccounts(stored[list]));
     }
     applyState();
     scheduleScan();
@@ -385,9 +398,10 @@ api.storage.onChanged.addListener((changes, areaName) => {
       touched = true;
     }
   }
-  if (changes.allowedAccounts) {
-    allowedAccounts = new Set(normalizeAllowedAccounts(changes.allowedAccounts.newValue));
-    pendingReadKeys?.add("allowedAccounts");
+  for (const list of Object.keys(accountLists)) {
+    if (!changes[list]) continue;
+    accountLists[list] = new Set(normalizeAccounts(changes[list].newValue));
+    pendingReadKeys?.add(list);
     touched = true;
   }
   if (touched) {

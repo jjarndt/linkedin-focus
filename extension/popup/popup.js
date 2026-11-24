@@ -25,21 +25,23 @@ function notifyActiveTab() {
   });
 }
 
-function initAllowedAccounts(stored) {
-  const form = document.getElementById("allowedAccountsForm");
-  const controls = document.getElementById("allowedAccountsControls");
-  const input = document.getElementById("accountUrl");
-  const list = document.getElementById("allowedAccountsList");
-  const status = document.getElementById("accountStatus");
-  const pageButton = document.getElementById("allowPageAccount");
-  let accounts = normalizeAllowedAccounts(stored);
+function initAccountList(key, stored, activeAccount) {
+  const section = document.querySelector(`[data-account-list="${key}"]`);
+  const form = section.querySelector("form");
+  const controls = form.querySelector("fieldset");
+  const input = form.querySelector("input");
+  const list = form.querySelector(".account-list");
+  const status = section.querySelector('[role="status"]');
+  const pageButton = section.querySelector(".page-account");
+  const membership = key === "allowedAccounts" ? "allowed" : "blocked";
+  let accounts = normalizeAccounts(stored);
   let pageAccount = null;
 
   function renderPageButton() {
-    const allowed = accounts.includes(pageAccount);
+    const included = accounts.includes(pageAccount);
     pageButton.hidden = !pageAccount;
-    pageButton.disabled = controls.disabled || allowed;
-    pageButton.textContent = allowed ? "Account allowed" : "Allow this account";
+    pageButton.disabled = controls.disabled || included;
+    pageButton.textContent = accountActionLabel(key, included);
     if (pageAccount) pageButton.setAttribute("aria-label", `${pageButton.textContent}: ${decodeURIComponent(pageAccount)}`);
   }
 
@@ -60,18 +62,18 @@ function initAllowedAccounts(stored) {
     }));
   }
 
-  async function save(path, allowed, retryControl) {
+  async function save(path, include, retryControl) {
     if (controls.disabled) return;
     controls.disabled = true;
     renderPageButton();
     try {
-      accounts = await changeAllowedAccount(api, path, allowed);
+      accounts = await changeAccountList(api, key, path, include);
       render();
-      status.textContent = allowed ? "Account added." : "Account removed.";
+      status.textContent = include ? "Account added." : "Account removed.";
       notifyActiveTab();
     } catch (e) {
-      status.textContent = "Could not save your allowed accounts. Try again.";
-      console.error("[LinkedIn Focus] allowed accounts update failed", e);
+      status.textContent = `Could not save your ${membership} accounts. Try again.`;
+      console.error(`[LinkedIn Focus] ${membership} accounts update failed`, e);
       return false;
     } finally {
       controls.disabled = false;
@@ -91,7 +93,7 @@ function initAllowedAccounts(stored) {
       return;
     }
     if (accounts.includes(path)) {
-      status.textContent = "This account is already allowed.";
+      status.textContent = `This account is already ${membership}.`;
       input.focus();
       return;
     }
@@ -103,11 +105,9 @@ function initAllowedAccounts(stored) {
   input.addEventListener("input", () => { status.textContent = ""; });
   render();
   controls.disabled = false;
-  messageActiveTab(GET_PAGE_ACCOUNT).then((path) => {
-    pageAccount = accountPath(path);
+  activeAccount.then((path) => {
+    pageAccount = path;
     renderPageButton();
-  }).catch(() => {
-    // The active tab may be outside LinkedIn or awaiting site access.
   });
 }
 
@@ -134,7 +134,11 @@ async function init() {
     });
     el.disabled = false;
   }
-  initAllowedAccounts(state.allowedAccounts);
+  // The active tab may be outside LinkedIn or awaiting site access.
+  const activeAccount = messageActiveTab(GET_PAGE_ACCOUNT).then((path) => accountPath(path), () => null);
+  for (const key of Object.keys(ACCOUNT_LIST_DEFAULTS)) {
+    initAccountList(key, state[key], activeAccount);
+  }
 }
 
 // Localization is cosmetic, wiring the toggles is not: a broken i18n API must
