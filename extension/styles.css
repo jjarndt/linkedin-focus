@@ -55,6 +55,7 @@ html:not(.lf-feed-page) .lf-post-account-actions { display: none !important; }
 /* --- Ads: JS-flagged promoted posts + sidebar advertisements --- */
 /* New shell: the right-rail ad is the only iframe inside an aside. */
 html.lf-hide-ads .lf-ad,
+html.lf-hide-ads.lf-feed-page .lf-puzzle-promo,
 html.lf-hide-ads aside div:has(> iframe),
 html.lf-hide-ads [aria-label="Advertisement"],
 html.lf-hide-ads .ad-banner-container {
@@ -64,6 +65,7 @@ html.lf-hide-ads .ad-banner-container {
 /* --- LinkedIn News module (right sidebar) --- */
 /* New shell: marked by JS (no stable anchor); classic shell: known hooks. */
 html.lf-hide-news .lf-news,
+html.lf-hide-news.lf-feed-page .lf-puzzle-promo,
 html.lf-hide-news .news-module,
 html.lf-hide-news #feed-news-module,
 html.lf-hide-news .feed-news-module,

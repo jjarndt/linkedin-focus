@@ -345,6 +345,25 @@ function markNews() {
   markedNews = targets;
 }
 
+// LinkedIn promotes its own puzzle in a separate card, not a sponsored
+// feed post. Reuse the rail boundary and wrapper logic, so adjacent cards
+// (including News) are not hidden by the Ads toggle.
+let markedPuzzles = new Set();
+
+function markPuzzlePromos() {
+  const targets = new Set();
+  if (isFeedPage()) {
+    for (const mod of document.querySelectorAll('aside [componentkey="feedRightNavGamesComponentRef"]')) {
+      targets.add(outermostSingleChildWrapper(mod, mod.closest("aside")));
+    }
+  }
+  for (const previous of markedPuzzles) {
+    if (!targets.has(previous)) previous.classList.remove("lf-puzzle-promo");
+  }
+  for (const target of targets) target.classList.add("lf-puzzle-promo");
+  markedPuzzles = targets;
+}
+
 // ---- Scan scheduling -------------------------------------------------------
 
 let scheduled = false;
@@ -359,6 +378,7 @@ function scheduleScan() {
     }
     applyState(); // path may have changed via SPA nav
     if (currentState.hideNews) markNews();
+    if (currentState.hideAds || currentState.hideNews || markedPuzzles.size) markPuzzlePromos();
   });
 }
 

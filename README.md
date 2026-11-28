@@ -31,9 +31,9 @@ and persisted in `storage.local`:
   shows posts from those authors. Posts from **Blocked accounts** stay hidden
   in both feed modes. Profiles and messaging stay available.
 - **Ads** — promoted posts (detected in JavaScript by their label text, German
-  and English) plus sidebar advertisements.
+  and English), sidebar advertisements, and LinkedIn’s Puzzle Games promotion.
 - **News & Games** — the "LinkedIn News" module and the daily-games box in the
-  right sidebar.
+  right sidebar, including the Puzzle Games card.
 - **Notification badges** — the red counters in the top navigation. The nav
   itself stays fully clickable.
 

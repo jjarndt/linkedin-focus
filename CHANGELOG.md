@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-11-28
+
+### Fixed
+
+- Hide the LinkedIn Puzzle Games promotion when Ads or News & Games is hidden,
+  without hiding adjacent sidebar cards.
+
 ## [1.3.1] - 2026-11-24
 
 ### Added
@@ -136,7 +143,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writable by the page: LinkedIn could have pinned it so the scan was skipped and
   an ad stayed visible, or frozen a "promoted" flag onto an organic post.
 
-[Unreleased]: https://github.com/jjarndt/linkedin-focus/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/jjarndt/linkedin-focus/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/jjarndt/linkedin-focus/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/jjarndt/linkedin-focus/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/jjarndt/linkedin-focus/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/jjarndt/linkedin-focus/compare/v1.1.0...v1.2.0
